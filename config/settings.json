@@ -1,0 +1,7 @@
+{
+  "min_margin": 50,
+  "top_n": 20,
+  "high_volume_only": true,
+  "min_price": 100,
+  "max_price": 50000000
+}
