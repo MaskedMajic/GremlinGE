@@ -7,10 +7,12 @@ import com.maskedmajic.gremlinge.ge.GeStateReader;
 import com.maskedmajic.gremlinge.ge.GeStateTracker;
 import com.maskedmajic.gremlinge.ge.LimitStatus;
 import com.maskedmajic.gremlinge.ge.LimitUsageService;
+import com.maskedmajic.gremlinge.ge.OfferRepository;
 import com.maskedmajic.gremlinge.profit.ProfitSummary;
 import com.maskedmajic.gremlinge.profit.ProfitTrackerService;
 import java.awt.image.BufferedImage;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
@@ -45,9 +47,11 @@ public class GremlinGEPlugin extends Plugin {
 
     private final GeStateReader stateReader = new GeStateReader();
     private final GeStateTracker stateTracker = new GeStateTracker();
+    private final OfferRepository offerRepository = new OfferRepository();
     private final LimitUsageService limitUsageService = new LimitUsageService(Paths.get("data", "purchases.json"));
     private final ProfitTrackerService profitTrackerService = new ProfitTrackerService(Paths.get("data", "fills.json"));
     private final GremlinGEPanel panel = new GremlinGEPanel();
+    private final List<GeOfferEvent> recentEvents = new ArrayList<GeOfferEvent>();
 
     private NavigationButton navigationButton;
 
@@ -62,14 +66,18 @@ public class GremlinGEPlugin extends Plugin {
             .build();
 
         clientToolbar.addNavigation(navigationButton);
+        loadRecentEvents();
 
         GeOfferSnapshot snapshot = stateReader.readCurrentSnapshot(client, itemManager);
         stateTracker.update(snapshot);
+        persistSnapshot(snapshot);
         refreshPanel(snapshot);
     }
 
     @Override
     protected void shutDown() {
+        persistSnapshot(stateReader.readCurrentSnapshot(client, itemManager));
+
         if (navigationButton != null) {
             clientToolbar.removeNavigation(navigationButton);
             navigationButton = null;
@@ -84,6 +92,13 @@ public class GremlinGEPlugin extends Plugin {
 
         GeOfferSnapshot snapshot = stateReader.readCurrentSnapshot(client, itemManager);
         List<GeOfferEvent> events = stateTracker.update(snapshot);
+        persistSnapshot(snapshot);
+
+        if (!events.isEmpty()) {
+            recentEvents.addAll(events);
+            trimRecentEvents();
+            persistEvents(events);
+        }
 
         for (GeOfferEvent geEvent : events) {
             handleGeEvent(geEvent);
@@ -94,7 +109,7 @@ public class GremlinGEPlugin extends Plugin {
 
     @Subscribe
     public void onClientShutdown(ClientShutdown event) {
-        // Reserved for later persistence / graceful cleanup if needed.
+        persistSnapshot(stateReader.readCurrentSnapshot(client, itemManager));
     }
 
     @Provides
@@ -112,12 +127,16 @@ public class GremlinGEPlugin extends Plugin {
     }
 
     private void refreshPanel(GeOfferSnapshot snapshot) {
-        panel.updateOffers(snapshot != null ? snapshot.slots : Collections.<com.maskedmajic.gremlinge.ge.GeOfferState>emptyList());
+        List<com.maskedmajic.gremlinge.ge.GeOfferState> offers = snapshot != null
+            ? snapshot.slots
+            : Collections.<com.maskedmajic.gremlinge.ge.GeOfferState>emptyList();
+
+        panel.updateSummary(offers);
+        panel.updateOffers(offers);
+        panel.updateEvents(recentEvents);
 
         try {
-            List<LimitStatus> statuses = limitUsageService.buildLimitStatuses(
-                snapshot != null ? snapshot.slots : Collections.<com.maskedmajic.gremlinge.ge.GeOfferState>emptyList()
-            );
+            List<LimitStatus> statuses = limitUsageService.buildLimitStatuses(offers);
             panel.updateLimits(statuses);
         } catch (Exception e) {
             panel.updateLimits(Collections.<LimitStatus>emptyList());
@@ -128,6 +147,36 @@ public class GremlinGEPlugin extends Plugin {
             panel.updateProfit(summary);
         } catch (Exception e) {
             panel.updateProfit(null);
+        }
+    }
+
+    private void loadRecentEvents() {
+        recentEvents.clear();
+        try {
+            recentEvents.addAll(offerRepository.loadEvents());
+            trimRecentEvents();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void persistSnapshot(GeOfferSnapshot snapshot) {
+        try {
+            offerRepository.saveSnapshot(snapshot);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void persistEvents(List<GeOfferEvent> events) {
+        try {
+            offerRepository.appendEvents(events);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void trimRecentEvents() {
+        int overflow = recentEvents.size() - 50;
+        if (overflow > 0) {
+            recentEvents.subList(0, overflow).clear();
         }
     }
 }
