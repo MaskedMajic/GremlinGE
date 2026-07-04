@@ -6,6 +6,10 @@ plugins {
 group = 'com.maskedmajic'
 version = '0.1.0'
 
+def runeLiteVersion = '1.12.3'
+def pluginLauncherClass = 'com.maskedmajic.gremlinge.runelite.GremlinGEPluginTest'
+def scannerMainClass = 'com.maskedmajic.gremlinge.GremlinGE'
+
 repositories {
     mavenCentral()
     maven { url 'https://repo.runelite.net' }
@@ -14,12 +18,33 @@ repositories {
 dependencies {
     implementation 'com.google.code.gson:gson:2.11.0'
 
-    // RuneLite API surfaces for future plugin integration
-    compileOnly 'net.runelite:client:1.12.3'
-    compileOnly 'net.runelite:runelite-api:1.12.3'
+    compileOnly "net.runelite:client:${runeLiteVersion}"
+    compileOnly "net.runelite:runelite-api:${runeLiteVersion}"
+
+    testImplementation "net.runelite:client:${runeLiteVersion}"
+    testImplementation "net.runelite:runelite-api:${runeLiteVersion}"
+    testImplementation "net.runelite:jshell:${runeLiteVersion}"
 }
 
-sourceCompatibility = 17
-targetCompatibility = 17
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
 
-mainClassName = 'com.maskedmajic.gremlinge.GremlinGE'
+application {
+    mainClass = scannerMainClass
+}
+
+tasks.named('run', JavaExec) {
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = pluginLauncherClass
+    jvmArgs '-ea'
+    args '--developer-mode', '--debug'
+}
+
+tasks.register('runScanner', JavaExec) {
+    group = 'application'
+    description = 'Runs the GremlinGE CLI market scanner.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = scannerMainClass
+}
