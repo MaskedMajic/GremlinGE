@@ -4,21 +4,21 @@ import com.maskedmajic.gremlinge.ge.GeOfferEvent;
 import com.maskedmajic.gremlinge.ge.GeOfferSnapshot;
 import com.maskedmajic.gremlinge.ge.GeStateReader;
 import com.maskedmajic.gremlinge.ge.GeStateTracker;
+import com.maskedmajic.gremlinge.ge.LimitUsageService;
 import net.runelite.api.Client;
 import net.runelite.api.events.GrandExchangeOfferChanged;
 import net.runelite.client.game.ItemManager;
 
+import java.nio.file.Paths;
 import java.util.List;
 
 /**
- * RuneLite plugin skeleton with the real event/data flow documented in code.
- *
- * Still not a full RuneLite Plugin subclass yet, but this now reflects the
- * actual method shapes we want once we wire annotations + DI + panel hookup.
+ * RuneLite plugin skeleton with real event/data flow.
  */
 public class GremlinGEPlugin {
     private final GeStateReader stateReader = new GeStateReader();
     private final GeStateTracker stateTracker = new GeStateTracker();
+    private final LimitUsageService limitUsageService = new LimitUsageService(Paths.get("data", "purchases.json"));
 
     private Client client;
     private ItemManager itemManager;
@@ -27,7 +27,6 @@ public class GremlinGEPlugin {
         this.client = client;
         this.itemManager = itemManager;
 
-        // Initial truth snapshot on startup/login/plugin enable.
         GeOfferSnapshot snapshot = stateReader.readCurrentSnapshot(client, itemManager);
         stateTracker.update(snapshot);
     }
@@ -37,13 +36,6 @@ public class GremlinGEPlugin {
         this.itemManager = null;
     }
 
-    /**
-     * Planned RuneLite event hook shape.
-     *
-     * Real plugin version later will subscribe with RuneLite's event bus:
-     *   @Subscribe
-     *   public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event)
-     */
     public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event) {
         if (client == null || itemManager == null || event == null) {
             return;
@@ -58,9 +50,15 @@ public class GremlinGEPlugin {
     }
 
     private void handleGeEvent(GeOfferEvent geEvent) {
+        try {
+            java.util.List<GeOfferEvent> one = java.util.Collections.singletonList(geEvent);
+            limitUsageService.consumeEvents(one);
+        } catch (Exception ignored) {
+            // TODO: add proper plugin logging once RuneLite plugin lifecycle is fully wired.
+        }
+
         // TODO next steps:
-        // - feed buy-fill events into automatic limit usage tracking
-        // - persist event history if useful
+        // - persist richer event history if useful
         // - trigger side-panel refresh
         // - trigger notifications (offer complete, slot free, etc.)
     }
