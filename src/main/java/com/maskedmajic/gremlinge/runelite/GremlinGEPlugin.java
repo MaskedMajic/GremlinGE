@@ -19,6 +19,7 @@ public class GremlinGEPlugin {
     private final GeStateReader stateReader = new GeStateReader();
     private final GeStateTracker stateTracker = new GeStateTracker();
     private final LimitUsageService limitUsageService = new LimitUsageService(Paths.get("data", "purchases.json"));
+    private final GremlinGEPanel panel = new GremlinGEPanel();
 
     private Client client;
     private ItemManager itemManager;
@@ -29,6 +30,7 @@ public class GremlinGEPlugin {
 
         GeOfferSnapshot snapshot = stateReader.readCurrentSnapshot(client, itemManager);
         stateTracker.update(snapshot);
+        refreshPanel(snapshot);
     }
 
     public void shutDown() {
@@ -47,6 +49,12 @@ public class GremlinGEPlugin {
         for (GeOfferEvent geEvent : events) {
             handleGeEvent(geEvent);
         }
+
+        refreshPanel(snapshot);
+    }
+
+    public GremlinGEPanel getPanel() {
+        return panel;
     }
 
     private void handleGeEvent(GeOfferEvent geEvent) {
@@ -57,9 +65,17 @@ public class GremlinGEPlugin {
             // TODO: add proper plugin logging once RuneLite plugin lifecycle is fully wired.
         }
 
-        // TODO next steps:
+        // TODO later:
         // - persist richer event history if useful
-        // - trigger side-panel refresh
         // - trigger notifications (offer complete, slot free, etc.)
+    }
+
+    private void refreshPanel(GeOfferSnapshot snapshot) {
+        panel.updateOffers(snapshot != null ? snapshot.slots : java.util.Collections.emptyList());
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Automatic limit usage wiring is active.\n");
+        sb.append("Detailed per-item limit rendering comes next.\n");
+        panel.updateLimits(sb.toString());
     }
 }
