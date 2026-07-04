@@ -8,11 +8,10 @@ import net.runelite.client.game.ItemManager;
 
 /**
  * RuneLite-facing GE state reader.
- *
- * Reads the client's current GE slot state and normalizes it into GremlinGE's
- * internal snapshot model.
  */
 public class GeStateReader {
+    private final ItemLimitService itemLimitService = new ItemLimitService();
+
     public GeOfferSnapshot readCurrentSnapshot(Client client, ItemManager itemManager) {
         GeOfferSnapshot snapshot = new GeOfferSnapshot();
         snapshot.capturedAtEpochSeconds = System.currentTimeMillis() / 1000L;
@@ -48,6 +47,7 @@ public class GeStateReader {
 
         state.itemId = offer.getItemId();
         state.itemName = lookupItemName(offer.getItemId(), itemManager);
+        state.buyLimit = itemLimitService.getLimit(offer.getItemId());
         state.offerType = normalizeType(offer.getState());
         state.price = offer.getPrice();
         state.totalQuantity = offer.getTotalQuantity();
@@ -68,7 +68,6 @@ public class GeStateReader {
                 return item.getName();
             }
         } catch (Exception ignored) {
-            // Keep fallback below; we do not want item-name lookup failures to kill state reading.
         }
 
         return "Item " + itemId;

@@ -11,7 +11,9 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -108,5 +110,35 @@ public class LimitUsageService {
         long hours = remaining / 3600;
         long minutes = (remaining % 3600) / 60;
         return String.format("%dh %02dm", hours, minutes);
+    }
+
+    public List<LimitStatus> buildLimitStatuses(List<GeOfferState> offers) throws IOException {
+        Map<String, Integer> itemLimits = new LinkedHashMap<String, Integer>();
+        for (GeOfferState offer : offers) {
+            if (offer == null || offer.itemName == null || offer.itemName.trim().isEmpty()) {
+                continue;
+            }
+            if (offer.buyLimit > 0) {
+                itemLimits.put(offer.itemName, offer.buyLimit);
+            }
+        }
+
+        List<LimitStatus> result = new ArrayList<LimitStatus>();
+        for (Map.Entry<String, Integer> entry : itemLimits.entrySet()) {
+            String itemName = entry.getKey();
+            int buyLimit = entry.getValue();
+            int bought = getBoughtInWindow(itemName);
+            int remaining = Math.max(0, buyLimit - bought);
+            String eta = getNextResetEta(itemName);
+            result.add(new LimitStatus(itemName, buyLimit, bought, remaining, eta));
+        }
+
+        result.sort(new Comparator<LimitStatus>() {
+            @Override
+            public int compare(LimitStatus a, LimitStatus b) {
+                return a.itemName.compareToIgnoreCase(b.itemName);
+            }
+        });
+        return result;
     }
 }

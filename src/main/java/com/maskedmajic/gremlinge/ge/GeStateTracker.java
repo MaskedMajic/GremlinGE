@@ -71,6 +71,7 @@ public class GeStateTracker {
         event.itemId = state.itemId;
         event.itemName = state.itemName;
         event.offerType = state.offerType;
+        event.price = state.price;
         event.deltaFilled = deltaFilled;
         event.newFilledQuantity = state.filledQuantity;
         event.timestampEpochSeconds = System.currentTimeMillis() / 1000L;
