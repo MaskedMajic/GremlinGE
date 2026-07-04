@@ -67,6 +67,7 @@ public class GremlinGEPlugin extends Plugin {
 
         clientToolbar.addNavigation(navigationButton);
         loadRecentEvents();
+        loadPreviousSnapshot();
 
         GeOfferSnapshot snapshot = stateReader.readCurrentSnapshot(client, itemManager);
         stateTracker.update(snapshot);
@@ -155,6 +156,16 @@ public class GremlinGEPlugin extends Plugin {
         try {
             recentEvents.addAll(offerRepository.loadEvents());
             trimRecentEvents();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void loadPreviousSnapshot() {
+        try {
+            GeOfferSnapshot snapshot = offerRepository.loadSnapshot();
+            if (snapshot != null) {
+                stateTracker.seed(snapshot);
+            }
         } catch (Exception ignored) {
         }
     }

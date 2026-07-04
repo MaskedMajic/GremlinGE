@@ -9,6 +9,13 @@ import java.util.List;
 public class GeStateTracker {
     private GeOfferSnapshot previousSnapshot;
 
+    public void seed(GeOfferSnapshot snapshot) {
+        if (snapshot == null) {
+            return;
+        }
+        previousSnapshot = copySnapshot(snapshot);
+    }
+
     public List<GeOfferEvent> update(GeOfferSnapshot currentSnapshot) {
         List<GeOfferEvent> events = new ArrayList<GeOfferEvent>();
 

@@ -6,8 +6,10 @@ GremlinGE is a Java-first OSRS Grand Exchange flipping assistant built to grow i
 Help identify strong **high-volume GE flips** and track your **buy limits / live offer state** without automating gameplay.
 
 ## Current status
-### v0.3 complete
-GremlinGE currently supports:
+### v0.4 in progress
+GremlinGE now has two tracks living side-by-side:
+
+**CLI scanner (v0.3 foundation):**
 - live OSRS market data from the OSRS Wiki price API
 - top high-volume flip candidate ranking
 - item buy limits from mapping data
@@ -15,18 +17,34 @@ GremlinGE currently supports:
 - reset timer calculation
 - manual CLI purchase logging as a temporary bridge
 
+**RuneLite helper (v0.4 work-in-progress):**
+- live GE offer snapshot reading
+- active slot / item / price / quantity / side capture
+- fill progress tracking
+- event detection for placed / partial fill / completed / cancelled / cleared offers
+- local snapshot persistence (`data/ge_snapshot.json`)
+- local recent event persistence (`data/ge_events.json`)
+- automatic buy-limit tracking from detected buy fills
+- panel summary for open slots, active offers, partials, completes, recent events, limit status, and basic profit scaffolding
+
 ## Current commands
 ### Run scanner
 ```bash
 gradle -q run
 ```
 
-### Log a purchase manually (temporary)
+### Log a purchase manually (temporary CLI bridge)
 ```bash
 gradle -q run --args='buy Death_rune 5000'
 ```
 
+### Build project
+```bash
+./gradlew build -x test
+```
+
 ## Current output
+### CLI scanner
 GremlinGE prints:
 - item name
 - current buy / sell prices
@@ -38,6 +56,14 @@ GremlinGE prints:
 - remaining limit
 - reset ETA
 
+### RuneLite helper
+GremlinGE surfaces:
+- live active offers
+- recent GE state-change events
+- open-slot / partial / completed summary
+- auto-tracked limit usage
+- early profit-tracking scaffolding
+
 ## Project direction
 The real destination is a **RuneLite-integrated helper** that:
 - reads your live GE offer state
@@ -45,19 +71,20 @@ The real destination is a **RuneLite-integrated helper** that:
 - infers buy-limit usage automatically
 - surfaces high-volume flips worth rotating into next
 
-## Next milestone: v0.4
-### Live GE state reader
-Before GremlinGE feels truly good, it needs to stop relying on manual logging and instead read:
-- active GE offer slots
-- item / quantity / price / side
-- fill progress
-- completed / partial / cancelled state
+## Next milestone focus
+### Harden v0.4 live GE state awareness
+The current priority is not fancy automation or bloated UI. It is tightening the live state model so GremlinGE can reliably:
+- understand slot transitions across updates and restarts
+- detect fills and replacements cleanly
+- avoid noisy or misleading event spam
+- persist enough local state to stay context-aware
+- feed cleaner downstream limit/profit logic
 
-That will allow it to:
-- track your limits automatically
-- know when slots are open
-- know what filled
-- know what is still active
+### Immediate next steps
+- improve edge-case GE event accuracy further
+- make restart/resume behavior more state-aware
+- strengthen profit matching from fill history
+- keep panel improvements lightweight and state-focused
 
 ## What GremlinGE is NOT
 GremlinGE is not meant to:
@@ -72,3 +99,4 @@ It is meant to be a **flipping brain / state-aware helper**, not a bot.
 - Java-first so the core logic can later be reused in a RuneLite plugin
 - local runtime data stays out of git (`data/*.json`)
 - build artifacts are ignored
+- prefer `./gradlew` for reproducible local builds
