@@ -1,0 +1,8 @@
+{
+  "topN": 20,
+  "minMargin": 5,
+  "minVolume5m": 5000,
+  "minPrice": 100,
+  "maxPrice": 50000000,
+  "highVolumeOnly": true
+}

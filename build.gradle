@@ -11,15 +11,10 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.google.code.gson:gson:2.11.0'
+    compile 'com.google.code.gson:gson:2.11.0'
 }
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
-}
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
-application {
-    mainClass = 'com.maskedmajic.gremlinge.GremlinGE'
-}
+mainClassName = 'com.maskedmajic.gremlinge.GremlinGE'

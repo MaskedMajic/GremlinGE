@@ -22,11 +22,13 @@ public class FlipCandidate {
     }
 
     private int computeScore() {
-        int volumeBonus = switch (volumeTag) {
-            case "high" -> 3;
-            case "med" -> 2;
-            default -> 1;
-        };
+        int volumeBonus = 1;
+        if ("high".equals(volumeTag)) {
+            volumeBonus = 3;
+        } else if ("med".equals(volumeTag)) {
+            volumeBonus = 2;
+        }
+
         int limitBonus = Math.max(1, buyLimit / 1000);
         return margin * volumeBonus + Math.min(volume5m / 1000, 200) + limitBonus;
     }
