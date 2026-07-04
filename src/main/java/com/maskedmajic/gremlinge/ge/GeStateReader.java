@@ -1,85 +1,120 @@
 package com.maskedmajic.gremlinge.ge;
 
+import net.runelite.api.Client;
+import net.runelite.api.GrandExchangeOffer;
+import net.runelite.api.GrandExchangeOfferState;
+import net.runelite.api.ItemComposition;
+import net.runelite.client.game.ItemManager;
+
 /**
- * RuneLite-facing GE state reader skeleton.
+ * RuneLite-facing GE state reader.
  *
- * This remains dependency-free for now so the project can compile without
- * RuneLite jars present. The method signatures and comments reflect the exact
- * binding plan for when we add RuneLite API dependencies.
+ * Reads the client's current GE slot state and normalizes it into GremlinGE's
+ * internal snapshot model.
  */
 public class GeStateReader {
-    /**
-     * Future RuneLite binding entrypoint.
-     *
-     * Planned signature later:
-     *   readCurrentSnapshot(Client client, ItemManager itemManager)
-     *
-     * It will:
-     * - call client.getGrandExchangeOffers()
-     * - iterate all 8 slots
-     * - map each RuneLite offer into GeOfferState
-     * - return a GeOfferSnapshot
-     */
-    public GeOfferSnapshot readCurrentSnapshot() {
+    public GeOfferSnapshot readCurrentSnapshot(Client client, ItemManager itemManager) {
         GeOfferSnapshot snapshot = new GeOfferSnapshot();
         snapshot.capturedAtEpochSeconds = System.currentTimeMillis() / 1000L;
 
-        // TODO RuneLite binding plan:
-        // GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
-        // for (int slotIndex = 0; slotIndex < offers.length; slotIndex++) {
-        //     GrandExchangeOffer offer = offers[slotIndex];
-        //     GeOfferState state = mapOffer(slotIndex, offer, itemManager);
-        //     snapshot.slots.add(state);
-        // }
+        if (client == null) {
+            return snapshot;
+        }
+
+        GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
+        if (offers == null) {
+            return snapshot;
+        }
+
+        for (int slotIndex = 0; slotIndex < offers.length; slotIndex++) {
+            GrandExchangeOffer offer = offers[slotIndex];
+            GeOfferState state = mapOffer(slotIndex, offer, itemManager);
+            snapshot.slots.add(state);
+        }
 
         return snapshot;
     }
 
-    /**
-     * Planned mapping method shape once RuneLite APIs are wired in.
-     *
-     * Planned signature later:
-     *   private GeOfferState mapOffer(int slotIndex, GrandExchangeOffer offer, ItemManager itemManager)
-     *
-     * Mapping plan:
-     * - slot index -> state.slotIndex
-     * - offer item id -> state.itemId
-     * - item manager lookup -> state.itemName
-     * - offer price -> state.price
-     * - offer total quantity -> state.totalQuantity
-     * - offer quantity sold/bought -> state.filledQuantity
-     * - RuneLite buy/sell flag -> state.offerType
-     * - RuneLite offer state -> state.state
-     * - first seen / updated timestamps assigned locally
-     */
-    public GeOfferState mapPlaceholder(int slotIndex) {
+    private GeOfferState mapOffer(int slotIndex, GrandExchangeOffer offer, ItemManager itemManager) {
         GeOfferState state = new GeOfferState();
         state.slotIndex = slotIndex;
         state.firstSeenAtEpochSeconds = System.currentTimeMillis() / 1000L;
         state.lastUpdatedAtEpochSeconds = state.firstSeenAtEpochSeconds;
+
+        if (offer == null) {
+            state.state = OfferState.EMPTY;
+            return state;
+        }
+
+        state.itemId = offer.getItemId();
+        state.itemName = lookupItemName(offer.getItemId(), itemManager);
+        state.offerType = normalizeType(offer.getState());
+        state.price = offer.getPrice();
+        state.totalQuantity = offer.getTotalQuantity();
+        state.filledQuantity = offer.getQuantitySold();
+        state.state = normalizeState(offer.getState(), offer.getTotalQuantity(), offer.getQuantitySold());
+
         return state;
     }
 
-    /**
-     * Planned state normalization rules.
-     *
-     * RuneLite state -> GremlinGE state:
-     * - empty -> EMPTY
-     * - active/in progress -> ACTIVE
-     * - partial progress -> PARTIAL
-     * - completed -> COMPLETE
-     * - cancelled/aborted -> CANCELLED
-     */
-    public OfferState normalizePlaceholderState() {
-        return OfferState.UNKNOWN;
+    private String lookupItemName(int itemId, ItemManager itemManager) {
+        if (itemManager == null || itemId <= 0) {
+            return "Unknown";
+        }
+
+        try {
+            ItemComposition item = itemManager.getItemComposition(itemId);
+            if (item != null && item.getName() != null) {
+                return item.getName();
+            }
+        } catch (Exception ignored) {
+            // Keep fallback below; we do not want item-name lookup failures to kill state reading.
+        }
+
+        return "Item " + itemId;
     }
 
-    /**
-     * Planned offer-type mapping rules.
-     *
-     * RuneLite offer -> BUY / SELL / UNKNOWN.
-     */
-    public OfferType normalizePlaceholderType() {
-        return OfferType.UNKNOWN;
+    private OfferState normalizeState(GrandExchangeOfferState rlState, int total, int filled) {
+        if (rlState == null) {
+            return OfferState.UNKNOWN;
+        }
+
+        switch (rlState) {
+            case EMPTY:
+                return OfferState.EMPTY;
+            case CANCELLED_BUY:
+            case CANCELLED_SELL:
+                return OfferState.CANCELLED;
+            case BOUGHT:
+            case SOLD:
+                return OfferState.COMPLETE;
+            case BUYING:
+            case SELLING:
+                if (filled > 0 && filled < total) {
+                    return OfferState.PARTIAL;
+                }
+                return OfferState.ACTIVE;
+            default:
+                return OfferState.UNKNOWN;
+        }
+    }
+
+    private OfferType normalizeType(GrandExchangeOfferState rlState) {
+        if (rlState == null) {
+            return OfferType.UNKNOWN;
+        }
+
+        switch (rlState) {
+            case BUYING:
+            case BOUGHT:
+            case CANCELLED_BUY:
+                return OfferType.BUY;
+            case SELLING:
+            case SOLD:
+            case CANCELLED_SELL:
+                return OfferType.SELL;
+            default:
+                return OfferType.UNKNOWN;
+        }
     }
 }
