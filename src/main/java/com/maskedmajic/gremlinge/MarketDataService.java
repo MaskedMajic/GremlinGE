@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -19,18 +18,32 @@ public class MarketDataService {
     private static final String LATEST_URL = "https://prices.runescape.wiki/api/v1/osrs/latest";
     private static final String FIVE_MIN_URL = "https://prices.runescape.wiki/api/v1/osrs/5m";
     private static final String MAPPING_URL = "https://prices.runescape.wiki/api/v1/osrs/mapping";
+    private static final long DEFAULT_CACHE_MILLIS = 60_000L;
 
     private final HttpClient client = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(20))
         .build();
     private final Gson gson = new Gson();
 
+    private List<FlipCandidate> cachedCandidates = new ArrayList<FlipCandidate>();
+    private long cacheLoadedAtMillis;
+    private long cacheTtlMillis = DEFAULT_CACHE_MILLIS;
+
     public List<FlipCandidate> fetchCandidates(Settings settings) throws IOException, InterruptedException {
+        return fetchCandidates(settings, false);
+    }
+
+    public synchronized List<FlipCandidate> fetchCandidates(Settings settings, boolean forceRefresh) throws IOException, InterruptedException {
+        long now = System.currentTimeMillis();
+        if (!forceRefresh && !cachedCandidates.isEmpty() && now - cacheLoadedAtMillis < cacheTtlMillis) {
+            return new ArrayList<FlipCandidate>(cachedCandidates);
+        }
+
         JsonObject latest = fetchJsonObject(LATEST_URL).getAsJsonObject("data");
         JsonObject fiveMin = fetchJsonObject(FIVE_MIN_URL).getAsJsonObject("data");
         JsonArray mapping = fetchJsonArray(MAPPING_URL);
 
-        List<FlipCandidate> results = new ArrayList<>();
+        List<FlipCandidate> results = new ArrayList<FlipCandidate>();
         for (JsonElement el : mapping) {
             JsonObject item = el.getAsJsonObject();
             int id = item.get("id").getAsInt();
@@ -68,7 +81,20 @@ public class MarketDataService {
             results.add(new FlipCandidate(name, low, high, margin, volumeTag, limit, totalVol));
         }
 
-        return results;
+        cachedCandidates = new ArrayList<FlipCandidate>(results);
+        cacheLoadedAtMillis = now;
+        return new ArrayList<FlipCandidate>(cachedCandidates);
+    }
+
+    public synchronized void setCacheTtlMillis(long cacheTtlMillis) {
+        this.cacheTtlMillis = Math.max(5_000L, cacheTtlMillis);
+    }
+
+    public synchronized long getCacheAgeMillis() {
+        if (cacheLoadedAtMillis <= 0) {
+            return Long.MAX_VALUE;
+        }
+        return Math.max(0L, System.currentTimeMillis() - cacheLoadedAtMillis);
     }
 
     private String classifyVolume(int totalVol) {

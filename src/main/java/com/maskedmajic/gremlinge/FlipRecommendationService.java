@@ -22,6 +22,10 @@ public class FlipRecommendationService {
         this.marketDataService = marketDataService;
     }
 
+    public void setCacheTtlMillis(long cacheTtlMillis) {
+        marketDataService.setCacheTtlMillis(cacheTtlMillis);
+    }
+
     public List<FlipRecommendation> recommend(
         Settings settings,
         List<GeOfferState> activeOffers,

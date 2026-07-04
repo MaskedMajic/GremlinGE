@@ -38,8 +38,6 @@ import net.runelite.client.ui.NavigationButton;
     tags = {"ge", "grandexchange", "flipping", "money"}
 )
 public class GremlinGEPlugin extends Plugin {
-    private static final int RECOMMENDATION_COUNT = 5;
-
     @Inject
     private Client client;
 
@@ -152,16 +150,21 @@ public class GremlinGEPlugin extends Plugin {
             panel.updateLimits(Collections.<LimitStatus>emptyList());
         }
 
-        try {
-            Settings settings = ScannerSettingsLoader.load();
-            List<FlipRecommendation> recommendations = flipRecommendationService.recommend(
-                settings,
-                offers,
-                statuses,
-                RECOMMENDATION_COUNT
-            );
-            panel.updateRecommendations(recommendations);
-        } catch (Exception e) {
+        if (config.recommendationsEnabled()) {
+            try {
+                Settings settings = ScannerSettingsLoader.load();
+                flipRecommendationService.setCacheTtlMillis(config.marketRefreshSeconds() * 1000L);
+                List<FlipRecommendation> recommendations = flipRecommendationService.recommend(
+                    settings,
+                    offers,
+                    statuses,
+                    Math.max(1, config.recommendationCount())
+                );
+                panel.updateRecommendations(recommendations);
+            } catch (Exception e) {
+                panel.updateRecommendations(Collections.<FlipRecommendation>emptyList());
+            }
+        } else {
             panel.updateRecommendations(Collections.<FlipRecommendation>emptyList());
         }
 
