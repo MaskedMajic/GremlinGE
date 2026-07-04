@@ -1,10 +1,5 @@
 package com.maskedmajic.gremlinge;
 
-import com.google.gson.Gson;
-
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Comparator;
@@ -12,7 +7,7 @@ import java.util.List;
 
 public class GremlinGE {
     public static void main(String[] args) {
-        Settings settings = loadSettings();
+        Settings settings = ScannerSettingsLoader.load();
         MarketDataService service = new MarketDataService();
         LimitTrackerService limitTracker = new LimitTrackerService(Paths.get("data", "purchases.json"));
 
@@ -35,14 +30,6 @@ public class GremlinGE {
             System.err.println("Failed to run GremlinGE: " + e.getMessage());
             e.printStackTrace();
         }
-    }
-
-    private static Settings loadSettings() {
-        InputStream input = GremlinGE.class.getClassLoader().getResourceAsStream("settings.json");
-        if (input == null) {
-            return new Settings();
-        }
-        return new Gson().fromJson(new InputStreamReader(input, StandardCharsets.UTF_8), Settings.class);
     }
 
     private static void render(List<FlipCandidate> rows, int topN, LimitTrackerService limitTracker) throws Exception {

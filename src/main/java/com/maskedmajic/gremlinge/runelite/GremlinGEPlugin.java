@@ -1,8 +1,13 @@
 package com.maskedmajic.gremlinge.runelite;
 
 import com.google.inject.Provides;
+import com.maskedmajic.gremlinge.FlipRecommendation;
+import com.maskedmajic.gremlinge.FlipRecommendationService;
+import com.maskedmajic.gremlinge.ScannerSettingsLoader;
+import com.maskedmajic.gremlinge.Settings;
 import com.maskedmajic.gremlinge.ge.GeOfferEvent;
 import com.maskedmajic.gremlinge.ge.GeOfferSnapshot;
+import com.maskedmajic.gremlinge.ge.GeOfferState;
 import com.maskedmajic.gremlinge.ge.GeStateReader;
 import com.maskedmajic.gremlinge.ge.GeStateTracker;
 import com.maskedmajic.gremlinge.ge.LimitStatus;
@@ -33,6 +38,8 @@ import net.runelite.client.ui.NavigationButton;
     tags = {"ge", "grandexchange", "flipping", "money"}
 )
 public class GremlinGEPlugin extends Plugin {
+    private static final int RECOMMENDATION_COUNT = 5;
+
     @Inject
     private Client client;
 
@@ -50,6 +57,7 @@ public class GremlinGEPlugin extends Plugin {
     private final OfferRepository offerRepository = new OfferRepository();
     private final LimitUsageService limitUsageService = new LimitUsageService(Paths.get("data", "purchases.json"));
     private final ProfitTrackerService profitTrackerService = new ProfitTrackerService(Paths.get("data", "fills.json"));
+    private final FlipRecommendationService flipRecommendationService = new FlipRecommendationService();
     private final GremlinGEPanel panel = new GremlinGEPanel();
     private final List<GeOfferEvent> recentEvents = new ArrayList<GeOfferEvent>();
 
@@ -128,19 +136,33 @@ public class GremlinGEPlugin extends Plugin {
     }
 
     private void refreshPanel(GeOfferSnapshot snapshot) {
-        List<com.maskedmajic.gremlinge.ge.GeOfferState> offers = snapshot != null
+        List<GeOfferState> offers = snapshot != null
             ? snapshot.slots
-            : Collections.<com.maskedmajic.gremlinge.ge.GeOfferState>emptyList();
+            : Collections.<GeOfferState>emptyList();
 
         panel.updateSummary(offers);
         panel.updateOffers(offers);
         panel.updateEvents(recentEvents);
 
+        List<LimitStatus> statuses = Collections.emptyList();
         try {
-            List<LimitStatus> statuses = limitUsageService.buildLimitStatuses(offers);
+            statuses = limitUsageService.buildLimitStatuses(offers);
             panel.updateLimits(statuses);
         } catch (Exception e) {
             panel.updateLimits(Collections.<LimitStatus>emptyList());
+        }
+
+        try {
+            Settings settings = ScannerSettingsLoader.load();
+            List<FlipRecommendation> recommendations = flipRecommendationService.recommend(
+                settings,
+                offers,
+                statuses,
+                RECOMMENDATION_COUNT
+            );
+            panel.updateRecommendations(recommendations);
+        } catch (Exception e) {
+            panel.updateRecommendations(Collections.<FlipRecommendation>emptyList());
         }
 
         try {

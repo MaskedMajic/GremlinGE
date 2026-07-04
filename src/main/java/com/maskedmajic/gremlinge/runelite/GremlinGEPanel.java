@@ -1,5 +1,6 @@
 package com.maskedmajic.gremlinge.runelite;
 
+import com.maskedmajic.gremlinge.FlipRecommendation;
 import com.maskedmajic.gremlinge.ge.GeOfferEvent;
 import com.maskedmajic.gremlinge.ge.GeOfferState;
 import com.maskedmajic.gremlinge.ge.LimitStatus;
@@ -27,6 +28,7 @@ public class GremlinGEPanel extends PluginPanel {
     private final JLabel headerLabel = new JLabel("GremlinGE");
     private final JLabel summaryLabel = new JLabel("Waiting for GE state...");
     private final JTextArea offersArea = new JTextArea();
+    private final JTextArea candidatesArea = new JTextArea();
     private final JTextArea eventsArea = new JTextArea();
     private final JTextArea limitsArea = new JTextArea();
     private final JTextArea profitArea = new JTextArea();
@@ -48,11 +50,13 @@ public class GremlinGEPanel extends PluginPanel {
         content.add(summaryLabel);
 
         configureArea(offersArea, "Offers will appear here once GE state is wired in.\n");
+        configureArea(candidatesArea, "Scanner-backed next flips will appear here once market data is loaded.\n");
         configureArea(eventsArea, "Recent GE events will appear here once state changes are detected.\n");
         configureArea(limitsArea, "Limit usage will appear here once events are flowing.\n");
         configureArea(profitArea, "Profit tracking will appear here once fills are recorded.\n");
 
         content.add(makeSection("Active Offers", offersArea, 132));
+        content.add(makeSection("Next Flips", candidatesArea, 110));
         content.add(makeSection("Recent Events", eventsArea, 110));
         content.add(makeSection("Limit Status", limitsArea, 96));
         content.add(makeSection("Profit", profitArea, 84));
@@ -133,6 +137,32 @@ public class GremlinGEPanel extends PluginPanel {
 
         offersArea.setText(sb.toString());
         offersArea.setCaretPosition(0);
+    }
+
+    public void updateRecommendations(List<FlipRecommendation> recommendations) {
+        if (recommendations == null || recommendations.isEmpty()) {
+            candidatesArea.setText("No scanner-backed flip suggestions available yet.\n");
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (FlipRecommendation recommendation : recommendations) {
+            if (recommendation == null || recommendation.candidate == null) {
+                continue;
+            }
+
+            sb.append(trim(recommendation.candidate.name, 20))
+              .append(" | buy ").append(formatQty(recommendation.candidate.buy))
+              .append(" | sell ").append(formatQty(recommendation.candidate.sell))
+              .append(" | m ").append(formatQty(recommendation.candidate.margin))
+              .append(" | left ").append(formatQty(recommendation.remainingLimit))
+              .append(" | vol ").append(recommendation.candidate.volumeTag)
+              .append(" | score ").append(formatQty(recommendation.recommendationScore))
+              .append("\n");
+        }
+
+        candidatesArea.setText(sb.toString());
+        candidatesArea.setCaretPosition(0);
     }
 
     public void updateEvents(List<GeOfferEvent> events) {
