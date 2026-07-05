@@ -42,8 +42,8 @@ public class GremlinGEPanel extends PluginPanel {
 
     private final JLabel titleLabel = new JLabel("GremlinGE");
     private final JLabel subtitleLabel = new JLabel("GE helper");
-    private final JLabel overviewLine1 = new JLabel("Open: 0  |  Active: 0");
-    private final JLabel overviewLine2 = new JLabel("Partial: 0  |  Done: 0");
+    private final JLabel overviewLine1 = new JLabel("Open: 0   Active: 0");
+    private final JLabel overviewLine2 = new JLabel("Partial: 0   Done: 0");
 
     private final JPanel offersList = createListPanel();
     private final JPanel flipsList = createListPanel();
@@ -54,7 +54,7 @@ public class GremlinGEPanel extends PluginPanel {
     private final CardLayout sectionCards = new CardLayout();
     private final JPanel sectionCardPanel = new JPanel(sectionCards);
     private final Map<String, JButton> tabButtons = new LinkedHashMap<String, JButton>();
-    private final JLabel workspaceSubtitle = new JLabel("Offers, flips, events, limits, profit");
+    private final JLabel workspaceSubtitle = new JLabel("Offers and progress");
     private final JPanel workspaceActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
     private final JButton resetFlipsButton = new JButton("Reset Flips");
     private final JButton resetProfitButton = new JButton("Reset Profit");
@@ -118,8 +118,8 @@ public class GremlinGEPanel extends PluginPanel {
             }
         }
 
-        overviewLine1.setText("Open: " + openSlots + "  |  Active: " + activeOffers);
-        overviewLine2.setText("Partial: " + partialOffers + "  |  Done: " + completedOffers);
+        overviewLine1.setText("Open: " + openSlots + "   Active: " + activeOffers);
+        overviewLine2.setText("Partial: " + partialOffers + "   Done: " + completedOffers);
     }
 
     public void updateOffers(List<GeOfferState> offers) {
@@ -227,7 +227,6 @@ public class GremlinGEPanel extends PluginPanel {
     private JPanel buildOverviewCard() {
         JPanel card = createCardPanel();
         card.add(createCardHeading("Overview"));
-        card.add(createCardSubheading("Quick GE state"));
         card.add(Box.createVerticalStrut(6));
 
         configureOverviewLabel(overviewLine1);
@@ -281,8 +280,8 @@ public class GremlinGEPanel extends PluginPanel {
         JButton button = new JButton(label);
         button.setFocusPainted(false);
         button.setAlignmentY(Component.CENTER_ALIGNMENT);
-        button.setMaximumSize(new Dimension(72, 26));
-        button.setPreferredSize(new Dimension(72, 26));
+        button.setMaximumSize(new Dimension(68, 26));
+        button.setPreferredSize(new Dimension(68, 26));
         button.setFont(button.getFont().deriveFont(Font.BOLD, 10f));
         button.addActionListener(e -> switchTab(key));
         tabButtons.put(key, button);
@@ -313,13 +312,13 @@ public class GremlinGEPanel extends PluginPanel {
         resetProfitButton.setVisible(TAB_PROFIT.equals(activeTab));
 
         if (TAB_OFFERS.equals(activeTab)) {
-            workspaceSubtitle.setText("Live slots and current progress");
+            workspaceSubtitle.setText("Offers and progress");
         } else if (TAB_FLIPS.equals(activeTab)) {
-            workspaceSubtitle.setText("Best candidates right now");
+            workspaceSubtitle.setText("Best candidates");
         } else if (TAB_EVENTS.equals(activeTab)) {
-            workspaceSubtitle.setText("Latest GE changes");
+            workspaceSubtitle.setText("Latest changes");
         } else if (TAB_LIMITS.equals(activeTab)) {
-            workspaceSubtitle.setText("Usage and reset timing");
+            workspaceSubtitle.setText("Usage and resets");
         } else {
             workspaceSubtitle.setText("Tracked totals");
         }
@@ -332,7 +331,7 @@ public class GremlinGEPanel extends PluginPanel {
         JPanel row = createRowCard();
         row.add(buildTitleLine(trim(offer.itemName, 22), buildBadge(offer.offerType.toString(), badgeColorForType(offer.offerType.toString()))));
         row.add(Box.createVerticalStrut(4));
-        row.add(buildMetaLabel(offer.state + " | @ " + formatQty(offer.price)));
+        row.add(buildMainValueLabel(offer.state + "  @ " + formatQty(offer.price)));
         row.add(Box.createVerticalStrut(4));
         JProgressBar progressBar = new JProgressBar(0, Math.max(1, offer.totalQuantity));
         progressBar.setValue(Math.min(offer.filledQuantity, Math.max(1, offer.totalQuantity)));
@@ -347,9 +346,9 @@ public class GremlinGEPanel extends PluginPanel {
         JPanel row = createRowCard();
         row.add(buildTitleLine(trim(recommendation.candidate.name, 20), buildBadge(recommendation.candidate.volumeTag.toUpperCase(), badgeColorForVolume(recommendation.candidate.volumeTag))));
         row.add(Box.createVerticalStrut(4));
-        row.add(buildMetaLabel("Margin " + formatQty(recommendation.candidate.margin) + " gp | Left " + formatQty(recommendation.remainingLimit)));
-        row.add(Box.createVerticalStrut(4));
-        row.add(buildMetaLabel("Buy " + formatQty(recommendation.candidate.buy) + " | Sell " + formatQty(recommendation.candidate.sell)));
+        row.add(buildBigNumberLabel(formatQty(recommendation.candidate.margin) + " gp"));
+        row.add(Box.createVerticalStrut(2));
+        row.add(buildMetaLabel("Left " + formatQty(recommendation.remainingLimit)));
         return row;
     }
 
@@ -357,10 +356,10 @@ public class GremlinGEPanel extends PluginPanel {
         JPanel row = createRowCard();
         row.add(buildTitleLine(trim(event.itemName, 20), buildBadge(event.type.toString(), badgeColorForEvent(event.type.toString()))));
         row.add(Box.createVerticalStrut(4));
-        StringBuilder meta = new StringBuilder("Slot #").append(event.slotIndex + 1);
-        if (event.deltaFilled > 0) meta.append(" | +").append(formatQty(event.deltaFilled));
-        if (event.newFilledQuantity > 0) meta.append(" | total ").append(formatQty(event.newFilledQuantity));
-        row.add(buildMetaLabel(meta.toString()));
+        StringBuilder meta = new StringBuilder("Slot ").append(event.slotIndex + 1);
+        if (event.deltaFilled > 0) meta.append("  +").append(formatQty(event.deltaFilled));
+        if (event.newFilledQuantity > 0) meta.append("  Total ").append(formatQty(event.newFilledQuantity));
+        row.add(buildMainValueLabel(meta.toString()));
         return row;
     }
 
@@ -368,7 +367,7 @@ public class GremlinGEPanel extends PluginPanel {
         JPanel row = createRowCard();
         row.add(buildTitleLine(trim(status.itemName, 20), buildBadge("LEFT " + formatQty(status.remaining), new Color(80, 130, 70))));
         row.add(Box.createVerticalStrut(4));
-        row.add(buildMetaLabel(formatQty(status.boughtInWindow) + "/" + formatQty(status.buyLimit) + " used"));
+        row.add(buildMainValueLabel(formatQty(status.boughtInWindow) + "/" + formatQty(status.buyLimit) + " used"));
         row.add(Box.createVerticalStrut(4));
         JProgressBar progressBar = new JProgressBar(0, Math.max(1, status.buyLimit));
         progressBar.setValue(Math.min(status.boughtInWindow, Math.max(1, status.buyLimit)));
@@ -387,9 +386,9 @@ public class GremlinGEPanel extends PluginPanel {
         big.setAlignmentX(Component.LEFT_ALIGNMENT);
         row.add(big);
         row.add(Box.createVerticalStrut(4));
-        row.add(buildMetaLabel("Buys " + formatQty(summary.totalBuys) + " | Sells " + formatQty(summary.totalSells)));
+        row.add(buildMainValueLabel("Buys " + formatQty(summary.totalBuys) + "   Sells " + formatQty(summary.totalSells)));
         row.add(Box.createVerticalStrut(4));
-        row.add(buildMetaLabel("In " + formatQty(summary.grossBuyValue) + " | Out " + formatQty(summary.grossSellValue)));
+        row.add(buildMetaLabel("In " + formatQty(summary.grossBuyValue) + "   Out " + formatQty(summary.grossSellValue)));
         return row;
     }
 
@@ -402,6 +401,22 @@ public class GremlinGEPanel extends PluginPanel {
         line.add(label, BorderLayout.CENTER);
         if (badge != null) line.add(badge, BorderLayout.EAST);
         return line;
+    }
+
+    private JLabel buildMainValueLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setForeground(Color.WHITE);
+        label.setFont(label.getFont().deriveFont(Font.BOLD, 12f));
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return label;
+    }
+
+    private JLabel buildBigNumberLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setForeground(Color.WHITE);
+        label.setFont(label.getFont().deriveFont(Font.BOLD, 16f));
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return label;
     }
 
     private JLabel buildMetaLabel(String text) {
@@ -467,6 +482,7 @@ public class GremlinGEPanel extends PluginPanel {
         JLabel label = new JLabel(text);
         label.setForeground(Color.LIGHT_GRAY);
         label.setBorder(new EmptyBorder(8, 8, 8, 8));
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(label);
         refreshList(panel);
     }
@@ -478,14 +494,6 @@ public class GremlinGEPanel extends PluginPanel {
         JLabel label = new JLabel(text);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 14f));
         label.setForeground(Color.WHITE);
-        label.setAlignmentX(Component.LEFT_ALIGNMENT);
-        return label;
-    }
-
-    private JLabel createCardSubheading(String text) {
-        JLabel label = new JLabel(text);
-        label.setFont(label.getFont().deriveFont(Font.PLAIN, 11f));
-        label.setForeground(Color.LIGHT_GRAY);
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
         return label;
     }
@@ -502,13 +510,6 @@ public class GremlinGEPanel extends PluginPanel {
         button.setBackground(new Color(58, 58, 58));
         button.setForeground(Color.WHITE);
         button.setBorder(BorderFactory.createLineBorder(new Color(82, 82, 82)));
-    }
-
-    private JLabel createStatValue(String text) {
-        JLabel label = new JLabel(text, SwingConstants.CENTER);
-        label.setForeground(Color.WHITE);
-        label.setFont(label.getFont().deriveFont(Font.BOLD, 18f));
-        return label;
     }
 
     private Color badgeColorForType(String type) { return "BUY".equalsIgnoreCase(type) ? new Color(66, 135, 245) : new Color(196, 96, 76); }
