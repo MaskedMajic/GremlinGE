@@ -215,11 +215,14 @@ public class GremlinGEPanel extends PluginPanel {
         card.add(overviewLine2);
         card.add(Box.createVerticalStrut(8));
 
-        profitHeadline.setAlignmentX(Component.LEFT_ALIGNMENT);
+        profitHeadline.setAlignmentX(Component.CENTER_ALIGNMENT);
+        profitHeadline.setHorizontalAlignment(SwingConstants.CENTER);
         profitHeadline.setFont(profitHeadline.getFont().deriveFont(Font.BOLD, 15f));
         profitHeadline.setForeground(Color.WHITE);
         card.add(profitHeadline);
         card.add(Box.createVerticalStrut(6));
+
+        resetProfitButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         card.add(resetProfitButton);
         return card;
     }
