@@ -6,7 +6,7 @@ plugins {
 group = 'com.maskedmajic'
 version = '0.1.0'
 
-def runeLiteVersion = '1.12.3'
+def runeLiteVersion = 'latest.release'
 def pluginLauncherClass = 'com.maskedmajic.gremlinge.runelite.GremlinGEPluginTest'
 def scannerMainClass = 'com.maskedmajic.gremlinge.GremlinGE'
 
