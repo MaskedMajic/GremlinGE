@@ -156,7 +156,6 @@ public class GremlinGEPlugin extends Plugin {
 
         panel.updateSummary(offers);
         panel.updateOffers(offers);
-        panel.updateEvents(recentEvents);
 
         List<LimitStatus> statuses = Collections.emptyList();
         try {

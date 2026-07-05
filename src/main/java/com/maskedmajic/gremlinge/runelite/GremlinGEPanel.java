@@ -1,7 +1,6 @@
 package com.maskedmajic.gremlinge.runelite;
 
 import com.maskedmajic.gremlinge.FlipRecommendation;
-import com.maskedmajic.gremlinge.ge.GeOfferEvent;
 import com.maskedmajic.gremlinge.ge.GeOfferState;
 import com.maskedmajic.gremlinge.ge.LimitStatus;
 import com.maskedmajic.gremlinge.profit.ProfitSummary;
@@ -33,10 +32,10 @@ import net.runelite.client.ui.PluginPanel;
 public class GremlinGEPanel extends PluginPanel {
     private static final int CARD_GAP = 8;
     private static final int CONTENT_HEIGHT = 296;
+    private static final int ROW_HEIGHT = 86;
 
     private static final String TAB_OFFERS = "offers";
     private static final String TAB_FLIPS = "flips";
-    private static final String TAB_EVENTS = "events";
     private static final String TAB_LIMITS = "limits";
 
     private final JLabel titleLabel = new JLabel("GremlinGE");
@@ -47,7 +46,6 @@ public class GremlinGEPanel extends PluginPanel {
 
     private final JPanel offersList = createListPanel();
     private final JPanel flipsList = createListPanel();
-    private final JPanel eventsList = createListPanel();
     private final JPanel limitsList = createListPanel();
 
     private final CardLayout sectionCards = new CardLayout();
@@ -84,7 +82,6 @@ public class GremlinGEPanel extends PluginPanel {
 
         setPlaceholder(offersList, "Waiting for live GE offers...");
         setPlaceholder(flipsList, "Waiting for scanner-backed suggestions...");
-        setPlaceholder(eventsList, "No GE events recorded yet.");
         setPlaceholder(limitsList, "No active limit usage tracked yet.");
     }
 
@@ -152,25 +149,6 @@ public class GremlinGEPanel extends PluginPanel {
             flipsList.add(Box.createVerticalStrut(6));
         }
         refreshList(flipsList);
-    }
-
-    public void updateEvents(List<GeOfferEvent> events) {
-        resetList(eventsList);
-        if (events == null || events.isEmpty()) {
-            setPlaceholder(eventsList, "No GE events recorded yet.");
-            refreshList(eventsList);
-            return;
-        }
-        int start = Math.max(0, events.size() - 8);
-        for (int i = events.size() - 1; i >= start; i--) {
-            GeOfferEvent event = events.get(i);
-            if (event == null) {
-                continue;
-            }
-            eventsList.add(buildEventRow(event));
-            eventsList.add(Box.createVerticalStrut(6));
-        }
-        refreshList(eventsList);
     }
 
     public void updateLimits(List<LimitStatus> statuses) {
@@ -258,7 +236,6 @@ public class GremlinGEPanel extends PluginPanel {
         sectionCardPanel.setOpaque(false);
         sectionCardPanel.add(createScrollPane(offersList), TAB_OFFERS);
         sectionCardPanel.add(createScrollPane(flipsList), TAB_FLIPS);
-        sectionCardPanel.add(createScrollPane(eventsList), TAB_EVENTS);
         sectionCardPanel.add(createScrollPane(limitsList), TAB_LIMITS);
         sectionCards.show(sectionCardPanel, activeTab);
         updateWorkspaceChrome();
@@ -273,7 +250,6 @@ public class GremlinGEPanel extends PluginPanel {
         bar.setOpaque(false);
         addTabButton(bar, TAB_OFFERS, "Offers");
         addTabButton(bar, TAB_FLIPS, "Flips");
-        addTabButton(bar, TAB_EVENTS, "Events");
         addTabButton(bar, TAB_LIMITS, "Limits");
         refreshTabStyles();
         return bar;
@@ -283,8 +259,8 @@ public class GremlinGEPanel extends PluginPanel {
         JButton button = new JButton(label);
         button.setFocusPainted(false);
         button.setAlignmentY(Component.CENTER_ALIGNMENT);
-        button.setMaximumSize(new Dimension(82, 26));
-        button.setPreferredSize(new Dimension(82, 26));
+        button.setMaximumSize(new Dimension(96, 26));
+        button.setPreferredSize(new Dimension(96, 26));
         button.setFont(button.getFont().deriveFont(Font.BOLD, 10f));
         button.addActionListener(e -> switchTab(key));
         tabButtons.put(key, button);
@@ -317,8 +293,6 @@ public class GremlinGEPanel extends PluginPanel {
             workspaceSubtitle.setText("Offers and progress");
         } else if (TAB_FLIPS.equals(activeTab)) {
             workspaceSubtitle.setText("Best candidates");
-        } else if (TAB_EVENTS.equals(activeTab)) {
-            workspaceSubtitle.setText("Latest changes");
         } else {
             workspaceSubtitle.setText("Usage and resets");
         }
@@ -351,17 +325,6 @@ public class GremlinGEPanel extends PluginPanel {
         row.add(buildMainValueLabel("Buy " + formatQty(recommendation.candidate.buy) + "   Sell " + formatQty(recommendation.candidate.sell)));
         row.add(Box.createVerticalStrut(2));
         row.add(buildMetaLabel("Left " + formatQty(recommendation.remainingLimit)));
-        return row;
-    }
-
-    private JPanel buildEventRow(GeOfferEvent event) {
-        JPanel row = createRowCard();
-        row.add(buildTitleLine(trim(event.itemName, 20), buildBadge(event.type.toString(), badgeColorForEvent(event.type.toString()))));
-        row.add(Box.createVerticalStrut(4));
-        StringBuilder meta = new StringBuilder("Slot ").append(event.slotIndex + 1);
-        if (event.deltaFilled > 0) meta.append("  +").append(formatQty(event.deltaFilled));
-        if (event.newFilledQuantity > 0) meta.append("  Total ").append(formatQty(event.newFilledQuantity));
-        row.add(buildMainValueLabel(meta.toString()));
         return row;
     }
 
@@ -443,7 +406,9 @@ public class GremlinGEPanel extends PluginPanel {
         panel.setBackground(new Color(36, 36, 36));
         panel.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.setBorder(new CompoundBorder(BorderFactory.createLineBorder(new Color(55, 55, 55)), new EmptyBorder(8, 8, 8, 8)));
-        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        panel.setMinimumSize(new Dimension(0, ROW_HEIGHT));
+        panel.setPreferredSize(new Dimension(0, ROW_HEIGHT));
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, ROW_HEIGHT));
         return panel;
     }
 
@@ -452,6 +417,7 @@ public class GremlinGEPanel extends PluginPanel {
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setOpaque(true);
         panel.setBackground(new Color(34, 34, 34));
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
         return panel;
     }
 
@@ -506,13 +472,6 @@ public class GremlinGEPanel extends PluginPanel {
     private Color badgeColorForVolume(String tag) {
         if ("high".equalsIgnoreCase(tag)) return new Color(78, 138, 76);
         if ("med".equalsIgnoreCase(tag)) return new Color(177, 128, 53);
-        return new Color(92, 92, 92);
-    }
-    private Color badgeColorForEvent(String type) {
-        if (type.contains("COMPLETE")) return new Color(78, 138, 76);
-        if (type.contains("CANCEL")) return new Color(179, 74, 74);
-        if (type.contains("PARTIAL")) return new Color(177, 128, 53);
-        if (type.contains("PLACED")) return new Color(66, 135, 245);
         return new Color(92, 92, 92);
     }
 
