@@ -327,6 +327,13 @@ public class GremlinGEPanel extends PluginPanel {
         row.add(buildMainValueLabel("Buy " + formatQty(recommendation.candidate.buy) + "  Sell " + formatQty(recommendation.candidate.sell)));
         row.add(Box.createVerticalStrut(2));
         row.add(buildMetaLabel("Left " + formatQty(recommendation.remainingLimit)));
+        for (Component component : row.getComponents()) {
+            if (component instanceof JPanel) {
+                ((JPanel) component).setAlignmentX(Component.LEFT_ALIGNMENT);
+            } else if (component instanceof JLabel) {
+                ((JLabel) component).setAlignmentX(Component.LEFT_ALIGNMENT);
+            }
+        }
         return row;
     }
 
