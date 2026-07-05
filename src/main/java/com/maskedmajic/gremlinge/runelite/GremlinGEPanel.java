@@ -10,8 +10,8 @@ import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.GridLayout;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,7 +32,7 @@ import net.runelite.client.ui.PluginPanel;
 
 public class GremlinGEPanel extends PluginPanel {
     private static final int CARD_GAP = 8;
-    private static final int CONTENT_HEIGHT = 260;
+    private static final int CONTENT_HEIGHT = 278;
 
     private static final String TAB_OFFERS = "offers";
     private static final String TAB_FLIPS = "flips";
@@ -42,11 +42,8 @@ public class GremlinGEPanel extends PluginPanel {
 
     private final JLabel titleLabel = new JLabel("GremlinGE");
     private final JLabel subtitleLabel = new JLabel("GE helper");
-
-    private final JLabel openSlotsValue = createStatValue("0");
-    private final JLabel activeValue = createStatValue("0");
-    private final JLabel partialValue = createStatValue("0");
-    private final JLabel completeValue = createStatValue("0");
+    private final JLabel overviewLine1 = new JLabel("Open: 0  •  Active: 0");
+    private final JLabel overviewLine2 = new JLabel("Partial: 0  •  Done: 0");
 
     private final JPanel offersList = createListPanel();
     private final JPanel flipsList = createListPanel();
@@ -57,6 +54,10 @@ public class GremlinGEPanel extends PluginPanel {
     private final CardLayout sectionCards = new CardLayout();
     private final JPanel sectionCardPanel = new JPanel(sectionCards);
     private final Map<String, JButton> tabButtons = new LinkedHashMap<String, JButton>();
+    private final JLabel workspaceSubtitle = new JLabel("Offers, flips, events, limits, profit");
+    private final JPanel workspaceActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+    private final JButton resetFlipsButton = new JButton("Reset Flips");
+    private final JButton resetProfitButton = new JButton("Reset Profit");
     private String activeTab = TAB_OFFERS;
 
     public GremlinGEPanel() {
@@ -76,6 +77,12 @@ public class GremlinGEPanel extends PluginPanel {
         content.add(buildTabbedSectionCard());
 
         add(content, BorderLayout.CENTER);
+
+        configureActionButton(resetFlipsButton);
+        configureActionButton(resetProfitButton);
+        workspaceActions.setOpaque(false);
+        workspaceActions.add(resetFlipsButton);
+        workspaceActions.add(resetProfitButton);
 
         setPlaceholder(offersList, "Waiting for live GE offers...");
         setPlaceholder(flipsList, "Waiting for scanner-backed suggestions...");
@@ -111,10 +118,8 @@ public class GremlinGEPanel extends PluginPanel {
             }
         }
 
-        openSlotsValue.setText(Integer.toString(openSlots));
-        activeValue.setText(Integer.toString(activeOffers));
-        partialValue.setText(Integer.toString(partialOffers));
-        completeValue.setText(Integer.toString(completedOffers));
+        overviewLine1.setText("Open: " + openSlots + "  •  Active: " + activeOffers);
+        overviewLine2.setText("Partial: " + partialOffers + "  •  Done: " + completedOffers);
     }
 
     public void updateOffers(List<GeOfferState> offers) {
@@ -196,6 +201,14 @@ public class GremlinGEPanel extends PluginPanel {
         refreshList(profitList);
     }
 
+    public JButton getResetFlipsButton() {
+        return resetFlipsButton;
+    }
+
+    public JButton getResetProfitButton() {
+        return resetProfitButton;
+    }
+
     private JPanel buildHeaderCard() {
         JPanel card = createCardPanel();
         titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -213,29 +226,29 @@ public class GremlinGEPanel extends PluginPanel {
 
     private JPanel buildOverviewCard() {
         JPanel card = createCardPanel();
-        JLabel heading = createCardHeading("Overview");
-        JLabel subheading = createCardSubheading("Quick GE state");
+        card.add(createCardHeading("Overview"));
+        card.add(createCardSubheading("Quick GE state"));
+        card.add(Box.createVerticalStrut(6));
 
-        JPanel statsGrid = new JPanel(new GridLayout(2, 2, 8, 8));
-        statsGrid.setOpaque(false);
-        statsGrid.add(createStatCard("Open", openSlotsValue));
-        statsGrid.add(createStatCard("Active", activeValue));
-        statsGrid.add(createStatCard("Partial", partialValue));
-        statsGrid.add(createStatCard("Done", completeValue));
-
-        card.add(heading);
-        card.add(subheading);
-        card.add(Box.createVerticalStrut(8));
-        card.add(statsGrid);
+        configureOverviewLabel(overviewLine1);
+        configureOverviewLabel(overviewLine2);
+        card.add(overviewLine1);
+        card.add(Box.createVerticalStrut(2));
+        card.add(overviewLine2);
         return card;
     }
 
     private JPanel buildTabbedSectionCard() {
         JPanel card = createCardPanel();
         card.add(createCardHeading("Workspace"));
-        card.add(createCardSubheading("Offers, flips, events, limits, profit"));
+        workspaceSubtitle.setForeground(Color.LIGHT_GRAY);
+        workspaceSubtitle.setFont(workspaceSubtitle.getFont().deriveFont(Font.PLAIN, 11f));
+        workspaceSubtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.add(workspaceSubtitle);
         card.add(Box.createVerticalStrut(8));
         card.add(buildTabBar());
+        card.add(Box.createVerticalStrut(6));
+        card.add(workspaceActions);
         card.add(Box.createVerticalStrut(8));
 
         sectionCardPanel.setOpaque(false);
@@ -245,13 +258,15 @@ public class GremlinGEPanel extends PluginPanel {
         sectionCardPanel.add(createScrollPane(limitsList), TAB_LIMITS);
         sectionCardPanel.add(createScrollPane(profitList), TAB_PROFIT);
         sectionCards.show(sectionCardPanel, activeTab);
+        updateWorkspaceChrome();
 
         card.add(sectionCardPanel);
         return card;
     }
 
     private JPanel buildTabBar() {
-        JPanel bar = new JPanel(new GridLayout(1, 5, 4, 0));
+        JPanel bar = new JPanel();
+        bar.setLayout(new BoxLayout(bar, BoxLayout.X_AXIS));
         bar.setOpaque(false);
         addTabButton(bar, TAB_OFFERS, "Offers");
         addTabButton(bar, TAB_FLIPS, "Flips");
@@ -265,17 +280,21 @@ public class GremlinGEPanel extends PluginPanel {
     private void addTabButton(JPanel bar, final String key, String label) {
         JButton button = new JButton(label);
         button.setFocusPainted(false);
-        button.setBorder(new EmptyBorder(6, 4, 6, 4));
-        button.setFont(button.getFont().deriveFont(Font.BOLD, 11f));
+        button.setAlignmentY(Component.CENTER_ALIGNMENT);
+        button.setMaximumSize(new Dimension(72, 26));
+        button.setPreferredSize(new Dimension(72, 26));
+        button.setFont(button.getFont().deriveFont(Font.BOLD, 10f));
         button.addActionListener(e -> switchTab(key));
         tabButtons.put(key, button);
         bar.add(button);
+        bar.add(Box.createHorizontalStrut(4));
     }
 
     private void switchTab(String key) {
         activeTab = key;
         sectionCards.show(sectionCardPanel, key);
         refreshTabStyles();
+        updateWorkspaceChrome();
     }
 
     private void refreshTabStyles() {
@@ -287,6 +306,26 @@ public class GremlinGEPanel extends PluginPanel {
             button.setOpaque(true);
             button.setBorder(BorderFactory.createLineBorder(selected ? new Color(94, 156, 255) : new Color(72, 72, 72)));
         }
+    }
+
+    private void updateWorkspaceChrome() {
+        resetFlipsButton.setVisible(TAB_FLIPS.equals(activeTab));
+        resetProfitButton.setVisible(TAB_PROFIT.equals(activeTab));
+
+        if (TAB_OFFERS.equals(activeTab)) {
+            workspaceSubtitle.setText("Live slots and current progress");
+        } else if (TAB_FLIPS.equals(activeTab)) {
+            workspaceSubtitle.setText("Best candidates right now");
+        } else if (TAB_EVENTS.equals(activeTab)) {
+            workspaceSubtitle.setText("Latest GE changes");
+        } else if (TAB_LIMITS.equals(activeTab)) {
+            workspaceSubtitle.setText("Usage and reset timing");
+        } else {
+            workspaceSubtitle.setText("Tracked totals");
+        }
+
+        workspaceActions.revalidate();
+        workspaceActions.repaint();
     }
 
     private JPanel buildOfferRow(GeOfferState offer) {
@@ -439,6 +478,7 @@ public class GremlinGEPanel extends PluginPanel {
         JLabel label = new JLabel(text);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 14f));
         label.setForeground(Color.WHITE);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
         return label;
     }
 
@@ -446,24 +486,22 @@ public class GremlinGEPanel extends PluginPanel {
         JLabel label = new JLabel(text);
         label.setFont(label.getFont().deriveFont(Font.PLAIN, 11f));
         label.setForeground(Color.LIGHT_GRAY);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
         return label;
     }
 
-    private JPanel createStatCard(String labelText, JLabel valueLabel) {
-        JPanel statCard = new JPanel();
-        statCard.setLayout(new BoxLayout(statCard, BoxLayout.Y_AXIS));
-        statCard.setOpaque(true);
-        statCard.setBackground(new Color(44, 44, 44));
-        statCard.setBorder(new CompoundBorder(BorderFactory.createLineBorder(new Color(64, 64, 64)), new EmptyBorder(8, 8, 8, 8)));
-        JLabel label = new JLabel(labelText);
-        label.setAlignmentX(Component.CENTER_ALIGNMENT);
-        label.setForeground(Color.LIGHT_GRAY);
-        label.setFont(label.getFont().deriveFont(Font.PLAIN, 11f));
-        valueLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        statCard.add(valueLabel);
-        statCard.add(Box.createVerticalStrut(2));
-        statCard.add(label);
-        return statCard;
+    private void configureOverviewLabel(JLabel label) {
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        label.setForeground(Color.WHITE);
+        label.setFont(label.getFont().deriveFont(Font.BOLD, 12f));
+    }
+
+    private void configureActionButton(JButton button) {
+        button.setFocusPainted(false);
+        button.setFont(button.getFont().deriveFont(Font.BOLD, 10f));
+        button.setBackground(new Color(58, 58, 58));
+        button.setForeground(Color.WHITE);
+        button.setBorder(BorderFactory.createLineBorder(new Color(82, 82, 82)));
     }
 
     private JLabel createStatValue(String text) {
