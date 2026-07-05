@@ -176,6 +176,9 @@ public class GremlinGEPlugin extends Plugin {
 
         if (config.recommendationsEnabled()) {
             try {
+                String selectedBand = panel.getTierDropdown().getSelectedItem() != null
+                    ? panel.getTierDropdown().getSelectedItem().toString()
+                    : "All";
                 Settings settings = filteredSettings(ScannerSettingsLoader.load(), panel.getTierDropdown());
                 flipRecommendationService.setCacheTtlMillis(config.marketRefreshSeconds() * 1000L);
                 if (forceFlipRefresh) {
@@ -185,7 +188,8 @@ public class GremlinGEPlugin extends Plugin {
                     settings,
                     offers,
                     statuses,
-                    Math.max(1, config.recommendationCount())
+                    Math.max(1, config.recommendationCount()),
+                    selectedBand
                 );
                 forceFlipRefresh = false;
                 panel.updateRecommendations(recommendations);

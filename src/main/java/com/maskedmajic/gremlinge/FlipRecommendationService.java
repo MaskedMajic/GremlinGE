@@ -36,6 +36,16 @@ public class FlipRecommendationService {
         List<LimitStatus> limitStatuses,
         int maxResults
     ) throws IOException, InterruptedException {
+        return recommend(settings, activeOffers, limitStatuses, maxResults, "All");
+    }
+
+    public List<FlipRecommendation> recommend(
+        Settings settings,
+        List<GeOfferState> activeOffers,
+        List<LimitStatus> limitStatuses,
+        int maxResults,
+        String selectedBand
+    ) throws IOException, InterruptedException {
         List<FlipCandidate> candidates = marketDataService.fetchCandidates(settings);
         Set<String> activeNames = buildActiveNameSet(activeOffers);
         Map<String, LimitStatus> limitsByName = buildLimitMap(limitStatuses);
@@ -45,7 +55,11 @@ public class FlipRecommendationService {
             boolean alreadyActive = activeNames.contains(normalize(candidate.name));
             LimitStatus status = limitsByName.get(normalize(candidate.name));
             int remainingLimit = status != null ? status.remaining : candidate.buyLimit;
+            String priceBand = classifyPriceBand(candidate.buy);
 
+            if (!matchesBand(priceBand, selectedBand)) {
+                continue;
+            }
             if (alreadyActive) {
                 continue;
             }
@@ -57,7 +71,7 @@ public class FlipRecommendationService {
                 + Math.min(remainingLimit / 100, 100)
                 + volumeTagBonus(candidate.volumeTag);
 
-            recommendations.add(new FlipRecommendation(candidate, remainingLimit, false, recommendationScore));
+            recommendations.add(new FlipRecommendation(candidate, remainingLimit, false, recommendationScore, priceBand));
         }
 
         recommendations.sort(new Comparator<FlipRecommendation>() {
@@ -115,5 +129,25 @@ public class FlipRecommendationService {
 
     private String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase();
+    }
+
+    private String classifyPriceBand(int price) {
+        if (price <= 100_000) {
+            return "0-100k";
+        }
+        if (price <= 1_000_000) {
+            return "100k-1m";
+        }
+        if (price <= 10_000_000) {
+            return "1m-10m";
+        }
+        if (price <= 50_000_000) {
+            return "10m-50m";
+        }
+        return "50m+";
+    }
+
+    private boolean matchesBand(String candidateBand, String selectedBand) {
+        return selectedBand == null || "All".equals(selectedBand) || selectedBand.equals(candidateBand);
     }
 }
