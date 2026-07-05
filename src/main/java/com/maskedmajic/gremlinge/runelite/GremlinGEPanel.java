@@ -464,12 +464,10 @@ public class GremlinGEPanel extends PluginPanel {
                 trackColor = new Color(22, 22, 22);
             }
 
-            @Override
             protected JButton createDecreaseButton(int orientation) {
                 return createZeroButton();
             }
 
-            @Override
             protected JButton createIncreaseButton(int orientation) {
                 return createZeroButton();
             }
