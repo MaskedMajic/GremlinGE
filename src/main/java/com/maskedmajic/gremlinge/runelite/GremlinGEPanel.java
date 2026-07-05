@@ -11,6 +11,9 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,10 +26,12 @@ import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.SwingConstants;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
+import javax.swing.plaf.basic.BasicScrollBarUI;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
@@ -54,6 +59,10 @@ public class GremlinGEPanel extends PluginPanel {
     private final CardLayout sectionCards = new CardLayout();
     private final JPanel sectionCardPanel = new JPanel(sectionCards);
     private final Map<String, JButton> tabButtons = new LinkedHashMap<String, JButton>();
+    private final JLabel workspaceSubtitle = new JLabel("Offers and progress");
+    private final JPanel workspaceActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+    private final JButton refreshFlipsButton = new JButton("Refresh Flips");
+    private final JButton resetProfitButton = new JButton("Reset Profit");
     private final JComboBox<String> tierDropdown = new JComboBox<>(new String[] {
         "All",
         "0-100k",
@@ -62,9 +71,6 @@ public class GremlinGEPanel extends PluginPanel {
         "10m-50m",
         "50m+"
     });
-    private final JPanel workspaceActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-    private final JButton refreshFlipsButton = new JButton("Refresh Flips");
-    private final JButton resetProfitButton = new JButton("Reset Profit");
     private String activeTab = TAB_OFFERS;
 
     public GremlinGEPanel() {
@@ -216,7 +222,9 @@ public class GremlinGEPanel extends PluginPanel {
 
     private JPanel buildOverviewCard() {
         JPanel card = createCardPanel();
-        card.add(createCardHeading("Overview"));
+        JLabel overviewHeading = createCardHeading("Overview");
+        overviewHeading.setAlignmentX(Component.CENTER_ALIGNMENT);
+        card.add(overviewHeading);
         card.add(Box.createVerticalStrut(6));
 
         configureOverviewLabel(overviewLine1);
@@ -443,7 +451,54 @@ public class GremlinGEPanel extends PluginPanel {
         scrollPane.setMinimumSize(new Dimension(PluginPanel.PANEL_WIDTH - 24, CONTENT_HEIGHT));
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.getViewport().setBackground(new Color(34, 34, 34));
+        styleScrollbar(scrollPane.getVerticalScrollBar());
         return scrollPane;
+    }
+
+    private void styleScrollbar(JScrollBar scrollBar) {
+        scrollBar.setPreferredSize(new Dimension(8, Integer.MAX_VALUE));
+        scrollBar.setUI(new BasicScrollBarUI() {
+            @Override
+            protected void configureScrollBarColors() {
+                thumbColor = new Color(45, 45, 45);
+                trackColor = new Color(22, 22, 22);
+            }
+
+            @Override
+            protected JButton createDecreaseButton(int orientation) {
+                return createZeroButton();
+            }
+
+            @Override
+            protected JButton createIncreaseButton(int orientation) {
+                return createZeroButton();
+            }
+
+            @Override
+            protected void paintThumb(Graphics g, Component c, java.awt.Rectangle thumbBounds) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(55, 55, 55));
+                g2.fillRoundRect(thumbBounds.x + 1, thumbBounds.y, thumbBounds.width - 2, thumbBounds.height, 8, 8);
+                g2.dispose();
+            }
+
+            @Override
+            protected void paintTrack(Graphics g, Component c, java.awt.Rectangle trackBounds) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(new Color(20, 20, 20));
+                g2.fillRect(trackBounds.x, trackBounds.y, trackBounds.width, trackBounds.height);
+                g2.dispose();
+            }
+
+            private JButton createZeroButton() {
+                JButton button = new JButton();
+                button.setPreferredSize(new Dimension(0, 0));
+                button.setMinimumSize(new Dimension(0, 0));
+                button.setMaximumSize(new Dimension(0, 0));
+                return button;
+            }
+        });
     }
 
     private void setPlaceholder(JPanel panel, String text) {
@@ -468,7 +523,8 @@ public class GremlinGEPanel extends PluginPanel {
     }
 
     private void configureOverviewLabel(JLabel label) {
-        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        label.setAlignmentX(Component.CENTER_ALIGNMENT);
+        label.setHorizontalAlignment(SwingConstants.CENTER);
         label.setForeground(Color.WHITE);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 12f));
     }

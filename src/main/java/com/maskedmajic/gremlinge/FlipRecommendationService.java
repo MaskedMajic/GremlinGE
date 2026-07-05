@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -69,7 +70,9 @@ public class FlipRecommendationService {
 
             int recommendationScore = candidate.score
                 + Math.min(remainingLimit / 100, 100)
-                + volumeTagBonus(candidate.volumeTag);
+                + volumeTagBonus(candidate.volumeTag)
+                + priceBandBonus(priceBand)
+                + recentActivityBonus(candidate.volume5m);
 
             recommendations.add(new FlipRecommendation(candidate, remainingLimit, false, recommendationScore, priceBand));
         }
@@ -81,10 +84,42 @@ public class FlipRecommendationService {
             }
         });
 
+        return diversify(recommendations, maxResults, selectedBand);
+    }
+
+    private List<FlipRecommendation> diversify(List<FlipRecommendation> recommendations, int maxResults, String selectedBand) {
         if (recommendations.size() <= maxResults) {
             return recommendations;
         }
-        return new ArrayList<FlipRecommendation>(recommendations.subList(0, maxResults));
+
+        boolean useDiversification = selectedBand == null || "All".equals(selectedBand) || "0-100k".equals(selectedBand);
+        if (!useDiversification) {
+            return new ArrayList<FlipRecommendation>(recommendations.subList(0, maxResults));
+        }
+
+        List<FlipRecommendation> result = new ArrayList<FlipRecommendation>();
+        Set<String> seenPrefixes = new LinkedHashSet<String>();
+
+        for (FlipRecommendation recommendation : recommendations) {
+            String prefix = normalize(prefixOf(recommendation.candidate.name));
+            if (!seenPrefixes.contains(prefix) || result.size() + 3 >= maxResults) {
+                result.add(recommendation);
+                seenPrefixes.add(prefix);
+            }
+            if (result.size() >= maxResults) {
+                return result;
+            }
+        }
+
+        for (FlipRecommendation recommendation : recommendations) {
+            if (!result.contains(recommendation)) {
+                result.add(recommendation);
+            }
+            if (result.size() >= maxResults) {
+                break;
+            }
+        }
+        return result;
     }
 
     private Set<String> buildActiveNameSet(List<GeOfferState> activeOffers) {
@@ -127,6 +162,29 @@ public class FlipRecommendationService {
         return 0;
     }
 
+    private int recentActivityBonus(int volume5m) {
+        return Math.min(40, Math.max(0, volume5m / 1000));
+    }
+
+    private int priceBandBonus(String priceBand) {
+        if ("0-100k".equals(priceBand)) {
+            return 0;
+        }
+        if ("100k-1m".equals(priceBand)) {
+            return 10;
+        }
+        if ("1m-10m".equals(priceBand)) {
+            return 18;
+        }
+        if ("10m-50m".equals(priceBand)) {
+            return 24;
+        }
+        if ("50m+".equals(priceBand)) {
+            return 28;
+        }
+        return 0;
+    }
+
     private String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase();
     }
@@ -149,5 +207,13 @@ public class FlipRecommendationService {
 
     private boolean matchesBand(String candidateBand, String selectedBand) {
         return selectedBand == null || "All".equals(selectedBand) || selectedBand.equals(candidateBand);
+    }
+
+    private String prefixOf(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "";
+        }
+        String[] parts = name.trim().split("\\s+");
+        return parts.length == 0 ? name : parts[0];
     }
 }
