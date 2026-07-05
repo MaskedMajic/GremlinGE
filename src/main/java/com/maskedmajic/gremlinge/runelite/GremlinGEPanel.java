@@ -32,11 +32,11 @@ import net.runelite.client.ui.PluginPanel;
 public class GremlinGEPanel extends PluginPanel {
     private static final int CARD_GAP = 8;
     private static final int SMALL_CARD_HEIGHT = 78;
-    private static final int MEDIUM_CARD_HEIGHT = 128;
-    private static final int LARGE_CARD_HEIGHT = 150;
+    private static final int MEDIUM_CARD_HEIGHT = 118;
+    private static final int LARGE_CARD_HEIGHT = 132;
 
     private final JLabel titleLabel = new JLabel("GremlinGE");
-    private final JLabel subtitleLabel = new JLabel("State-aware GE helper");
+    private final JLabel subtitleLabel = new JLabel("GE helper");
 
     private final JLabel openSlotsValue = createStatValue("0");
     private final JLabel activeValue = createStatValue("0");
@@ -63,18 +63,19 @@ public class GremlinGEPanel extends PluginPanel {
         content.add(Box.createVerticalStrut(CARD_GAP));
         content.add(buildOverviewCard());
         content.add(Box.createVerticalStrut(CARD_GAP));
-        content.add(buildSectionCard("Active Offers", "What your GE slots are doing right now", offersArea, LARGE_CARD_HEIGHT));
+        content.add(buildSectionCard("Active Offers", "Live slots", offersArea, LARGE_CARD_HEIGHT));
         content.add(Box.createVerticalStrut(CARD_GAP));
-        content.add(buildSectionCard("Next Flips", "Scanner-backed opportunities worth rotating into", candidatesArea, LARGE_CARD_HEIGHT));
+        content.add(buildSectionCard("Next Flips", "Best candidates", candidatesArea, LARGE_CARD_HEIGHT));
         content.add(Box.createVerticalStrut(CARD_GAP));
-        content.add(buildSectionCard("Recent Events", "Newest GE state transitions first", eventsArea, MEDIUM_CARD_HEIGHT));
+        content.add(buildSectionCard("Recent Events", "Latest changes", eventsArea, MEDIUM_CARD_HEIGHT));
         content.add(Box.createVerticalStrut(CARD_GAP));
-        content.add(buildSectionCard("Buy Limits", "Tracked usage and reset timing", limitsArea, MEDIUM_CARD_HEIGHT));
+        content.add(buildSectionCard("Buy Limits", "Usage + reset", limitsArea, MEDIUM_CARD_HEIGHT));
         content.add(Box.createVerticalStrut(CARD_GAP));
-        content.add(buildSectionCard("Profit Snapshot", "Current tracked totals from recorded fills", profitArea, SMALL_CARD_HEIGHT));
+        content.add(buildSectionCard("Profit", "Tracked totals", profitArea, SMALL_CARD_HEIGHT));
 
         JScrollPane scrollPane = new JScrollPane(content);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
         add(scrollPane, BorderLayout.CENTER);
     }
@@ -125,19 +126,20 @@ public class GremlinGEPanel extends PluginPanel {
 
             sb.append("#")
                 .append(offer.slotIndex + 1)
+                .append(" ")
+                .append(trim(offer.itemName, 17))
+                .append("\n")
                 .append("  ")
-                .append(pad(trim(offer.itemName, 20), 20))
-                .append("  ")
-                .append(pad(offer.offerType + " " + offer.state, 14))
-                .append("  ")
-                .append(pad(formatQty(offer.filledQuantity) + "/" + formatQty(offer.totalQuantity), 16))
-                .append("  @ ")
-                .append(formatQty(offer.price));
-
-            if (offer.buyLimit > 0) {
-                sb.append("  lim ").append(formatQty(offer.buyLimit));
-            }
-            sb.append("\n");
+                .append(offer.offerType)
+                .append(" ")
+                .append(offer.state)
+                .append(" • ")
+                .append(formatQty(offer.filledQuantity))
+                .append("/")
+                .append(formatQty(offer.totalQuantity))
+                .append(" @ ")
+                .append(formatQty(offer.price))
+                .append("\n");
         }
 
         if (sb.length() == 0) {
@@ -160,15 +162,14 @@ public class GremlinGEPanel extends PluginPanel {
                 continue;
             }
 
-            sb.append(pad(trim(recommendation.candidate.name, 20), 20))
-                .append("  m ").append(pad(formatQty(recommendation.candidate.margin), 8))
-                .append("  buy ").append(pad(formatQty(recommendation.candidate.buy), 8))
-                .append("  sell ").append(pad(formatQty(recommendation.candidate.sell), 8))
-                .append("  left ").append(pad(formatQty(recommendation.remainingLimit), 8))
-                .append("  ")
+            sb.append(trim(recommendation.candidate.name, 18))
+                .append("\n")
+                .append("  margin ")
+                .append(formatQty(recommendation.candidate.margin))
+                .append(" • left ")
+                .append(formatQty(recommendation.remainingLimit))
+                .append(" • ")
                 .append(recommendation.candidate.volumeTag.toUpperCase())
-                .append("  score ")
-                .append(formatQty(recommendation.recommendationScore))
                 .append("\n");
         }
 
@@ -190,23 +191,17 @@ public class GremlinGEPanel extends PluginPanel {
                 continue;
             }
 
-            sb.append("#")
+            sb.append(event.type)
+                .append(" • #")
                 .append(event.slotIndex + 1)
-                .append("  ")
-                .append(pad(event.type.toString(), 13))
-                .append("  ")
-                .append(pad(trim(event.itemName, 18), 18))
-                .append("  ")
-                .append(pad(event.offerType.toString(), 5));
+                .append(" • ")
+                .append(trim(event.itemName, 16));
 
             if (event.deltaFilled > 0) {
-                sb.append("  +").append(formatQty(event.deltaFilled));
+                sb.append(" • +").append(formatQty(event.deltaFilled));
             }
             if (event.newFilledQuantity > 0) {
-                sb.append("  total ").append(formatQty(event.newFilledQuantity));
-            }
-            if (event.price > 0) {
-                sb.append("  @ ").append(formatQty(event.price));
+                sb.append(" • ").append(formatQty(event.newFilledQuantity));
             }
             sb.append("\n");
         }
@@ -222,11 +217,15 @@ public class GremlinGEPanel extends PluginPanel {
 
         StringBuilder sb = new StringBuilder();
         for (LimitStatus status : statuses) {
-            sb.append(pad(trim(status.itemName, 20), 20))
-                .append("  used ")
-                .append(pad(formatQty(status.boughtInWindow) + "/" + formatQty(status.buyLimit), 14))
-                .append("  left ")
-                .append(pad(formatQty(status.remaining), 8))
+            sb.append(trim(status.itemName, 18))
+                .append("\n")
+                .append("  ")
+                .append(formatQty(status.boughtInWindow))
+                .append("/")
+                .append(formatQty(status.buyLimit))
+                .append(" used • left ")
+                .append(formatQty(status.remaining))
+                .append("\n")
                 .append("  reset ")
                 .append(status.resetEta)
                 .append("\n");
@@ -242,11 +241,11 @@ public class GremlinGEPanel extends PluginPanel {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("Realized P/L  ").append(formatSigned(summary.realizedProfit)).append(" gp\n")
-            .append("Bought qty     ").append(formatQty(summary.totalBuys)).append("\n")
-            .append("Sold qty       ").append(formatQty(summary.totalSells)).append("\n")
-            .append("Buy value      ").append(formatQty(summary.grossBuyValue)).append(" gp\n")
-            .append("Sell value     ").append(formatQty(summary.grossSellValue)).append(" gp\n");
+        sb.append("P/L  ").append(formatSigned(summary.realizedProfit)).append(" gp\n")
+            .append("Buys ").append(formatQty(summary.totalBuys))
+            .append(" • Sells ").append(formatQty(summary.totalSells)).append("\n")
+            .append("In ").append(formatQty(summary.grossBuyValue))
+            .append(" • Out ").append(formatQty(summary.grossSellValue)).append("\n");
 
         profitArea.setText(sb.toString());
         profitArea.setCaretPosition(0);
@@ -271,16 +270,16 @@ public class GremlinGEPanel extends PluginPanel {
         JPanel card = createCardPanel();
 
         JLabel heading = createCardHeading("Overview");
-        JLabel subheading = createCardSubheading("Fast read on your current GE state");
+        JLabel subheading = createCardSubheading("Quick GE state");
         heading.setAlignmentX(Component.LEFT_ALIGNMENT);
         subheading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JPanel statsGrid = new JPanel(new GridLayout(2, 2, 8, 8));
         statsGrid.setOpaque(false);
-        statsGrid.add(createStatCard("Open Slots", openSlotsValue));
+        statsGrid.add(createStatCard("Open", openSlotsValue));
         statsGrid.add(createStatCard("Active", activeValue));
         statsGrid.add(createStatCard("Partial", partialValue));
-        statsGrid.add(createStatCard("Complete", completeValue));
+        statsGrid.add(createStatCard("Done", completeValue));
         statsGrid.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         card.add(heading);
@@ -368,8 +367,8 @@ public class GremlinGEPanel extends PluginPanel {
     private JTextArea createTextArea(String initialText) {
         JTextArea area = new JTextArea(initialText);
         area.setEditable(false);
-        area.setLineWrap(false);
-        area.setWrapStyleWord(false);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
         area.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
         area.setForeground(Color.WHITE);
         area.setBackground(new Color(34, 34, 34));
@@ -382,6 +381,7 @@ public class GremlinGEPanel extends PluginPanel {
         scrollPane.setBorder(BorderFactory.createLineBorder(new Color(58, 58, 58)));
         scrollPane.setPreferredSize(new Dimension(PluginPanel.PANEL_WIDTH - 24, height));
         scrollPane.setMinimumSize(new Dimension(PluginPanel.PANEL_WIDTH - 24, height));
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.getViewport().setBackground(new Color(34, 34, 34));
         return scrollPane;
     }
@@ -394,20 +394,6 @@ public class GremlinGEPanel extends PluginPanel {
             return value;
         }
         return value.substring(0, Math.max(0, max - 3)) + "...";
-    }
-
-    private String pad(String value, int width) {
-        if (value == null) {
-            value = "";
-        }
-        if (value.length() >= width) {
-            return value;
-        }
-        StringBuilder sb = new StringBuilder(value);
-        while (sb.length() < width) {
-            sb.append(' ');
-        }
-        return sb.toString();
     }
 
     private String formatQty(long value) {
