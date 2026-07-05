@@ -104,4 +104,8 @@ public class ProfitTrackerService {
         summary.realizedProfit = summary.grossSellValue - summary.grossBuyValue;
         return summary;
     }
+
+    public void reset() throws IOException {
+        saveFills(new ArrayList<FillRecord>());
+    }
 }

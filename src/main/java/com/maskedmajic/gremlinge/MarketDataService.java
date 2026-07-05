@@ -97,6 +97,11 @@ public class MarketDataService {
         return Math.max(0L, System.currentTimeMillis() - cacheLoadedAtMillis);
     }
 
+    public synchronized void clearCache() {
+        cachedCandidates = new ArrayList<FlipCandidate>();
+        cacheLoadedAtMillis = 0L;
+    }
+
     private String classifyVolume(int totalVol) {
         if (totalVol >= 25000) return "high";
         if (totalVol >= 8000) return "med";

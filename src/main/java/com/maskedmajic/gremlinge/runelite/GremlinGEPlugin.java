@@ -72,6 +72,7 @@ public class GremlinGEPlugin extends Plugin {
             .build();
 
         clientToolbar.addNavigation(navigationButton);
+        wirePanelActions();
         loadRecentEvents();
         loadPreviousSnapshot();
 
@@ -131,6 +132,21 @@ public class GremlinGEPlugin extends Plugin {
             profitTrackerService.consumeEvents(one);
         } catch (Exception ignored) {
         }
+    }
+
+    private void wirePanelActions() {
+        panel.getResetProfitButton().addActionListener(e -> {
+            try {
+                profitTrackerService.reset();
+            } catch (Exception ignored) {
+            }
+            refreshPanel(stateReader.readCurrentSnapshot(client, itemManager));
+        });
+
+        panel.getResetFlipsButton().addActionListener(e -> {
+            flipRecommendationService.clearCache();
+            refreshPanel(stateReader.readCurrentSnapshot(client, itemManager));
+        });
     }
 
     private void refreshPanel(GeOfferSnapshot snapshot) {
