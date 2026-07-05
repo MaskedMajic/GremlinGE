@@ -151,7 +151,11 @@ public class GremlinGEPlugin extends Plugin {
             refreshPanel(stateReader.readCurrentSnapshot(client, itemManager));
         });
 
-        panel.getTierDropdown().addActionListener(e -> refreshPanel(stateReader.readCurrentSnapshot(client, itemManager)));
+        panel.getTierDropdown().addActionListener(e -> {
+            flipRecommendationService.clearCache();
+            forceFlipRefresh = true;
+            refreshPanel(stateReader.readCurrentSnapshot(client, itemManager));
+        });
     }
 
     private void refreshPanel(GeOfferSnapshot snapshot) {

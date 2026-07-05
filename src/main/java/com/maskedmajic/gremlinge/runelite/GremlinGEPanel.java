@@ -226,12 +226,18 @@ public class GremlinGEPanel extends PluginPanel {
         card.add(overviewLine2);
         card.add(Box.createVerticalStrut(8));
 
-        profitHeadline.setAlignmentX(Component.LEFT_ALIGNMENT);
+        profitHeadline.setAlignmentX(Component.CENTER_ALIGNMENT);
+        profitHeadline.setHorizontalAlignment(SwingConstants.CENTER);
         profitHeadline.setFont(profitHeadline.getFont().deriveFont(Font.BOLD, 15f));
         profitHeadline.setForeground(Color.WHITE);
         card.add(profitHeadline);
         card.add(Box.createVerticalStrut(6));
-        card.add(resetProfitButton);
+
+        JPanel resetProfitWrap = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        resetProfitWrap.setOpaque(false);
+        resetProfitWrap.setAlignmentX(Component.CENTER_ALIGNMENT);
+        resetProfitWrap.add(resetProfitButton);
+        card.add(resetProfitWrap);
         return card;
     }
 
@@ -322,13 +328,24 @@ public class GremlinGEPanel extends PluginPanel {
 
     private JPanel buildFlipRow(FlipRecommendation recommendation) {
         JPanel row = createRowCard(FLIP_ROW_HEIGHT);
-        row.add(buildTitleLine(trim(recommendation.candidate.name, 26), buildBadge(recommendation.candidate.volumeTag.toUpperCase(), badgeColorForVolume(recommendation.candidate.volumeTag))));
+        JPanel title = buildTitleLine(trim(recommendation.candidate.name, 26), buildBadge(recommendation.candidate.volumeTag.toUpperCase(), badgeColorForVolume(recommendation.candidate.volumeTag)));
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.add(title);
         row.add(Box.createVerticalStrut(2));
-        row.add(buildBigNumberLabel(formatQty(recommendation.candidate.margin) + " gp net"));
+
+        JLabel net = buildBigNumberLabel(formatQty(recommendation.candidate.margin) + " gp net");
+        net.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.add(net);
         row.add(Box.createVerticalStrut(2));
-        row.add(buildMainValueLabel("Buy " + formatQty(recommendation.candidate.buy) + "  Sell " + formatQty(recommendation.candidate.sell)));
+
+        JLabel prices = buildMainValueLabel("Buy " + formatQty(recommendation.candidate.buy) + "  Sell " + formatQty(recommendation.candidate.sell));
+        prices.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.add(prices);
         row.add(Box.createVerticalStrut(2));
-        row.add(buildMetaLabel("Gross " + formatQty(recommendation.candidate.grossMargin) + "  Tax " + formatQty(recommendation.candidate.tax) + "  Left " + formatQty(recommendation.remainingLimit)));
+
+        JLabel meta = buildMetaLabel("Gross " + formatQty(recommendation.candidate.grossMargin) + "  Tax " + formatQty(recommendation.candidate.tax) + "  Left " + formatQty(recommendation.remainingLimit));
+        meta.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.add(meta);
         return row;
     }
 
@@ -343,6 +360,7 @@ public class GremlinGEPanel extends PluginPanel {
     private JPanel buildTitleLine(String title, JLabel badge) {
         JPanel line = new JPanel(new BorderLayout(6, 0));
         line.setOpaque(false);
+        line.setAlignmentX(Component.LEFT_ALIGNMENT);
         JLabel label = new JLabel(title);
         label.setForeground(Color.WHITE);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 13f));
