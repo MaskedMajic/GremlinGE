@@ -222,8 +222,11 @@ public class GremlinGEPanel extends PluginPanel {
         card.add(profitHeadline);
         card.add(Box.createVerticalStrut(6));
 
-        resetProfitButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        card.add(resetProfitButton);
+        JPanel resetProfitWrap = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        resetProfitWrap.setOpaque(false);
+        resetProfitWrap.setAlignmentX(Component.CENTER_ALIGNMENT);
+        resetProfitWrap.add(resetProfitButton);
+        card.add(resetProfitWrap);
         return card;
     }
 
