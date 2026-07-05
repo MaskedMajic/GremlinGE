@@ -32,9 +32,9 @@ import net.runelite.client.ui.PluginPanel;
 public class GremlinGEPanel extends PluginPanel {
     private static final int CARD_GAP = 8;
     private static final int CONTENT_HEIGHT = 296;
-    private static final int OFFER_ROW_HEIGHT = 74;
-    private static final int FLIP_ROW_HEIGHT = 84;
-    private static final int LIMIT_ROW_HEIGHT = 56;
+    private static final int OFFER_ROW_HEIGHT = 72;
+    private static final int FLIP_ROW_HEIGHT = 72;
+    private static final int LIMIT_ROW_HEIGHT = 48;
 
     private static final String TAB_OFFERS = "offers";
     private static final String TAB_FLIPS = "flips";
@@ -305,8 +305,8 @@ public class GremlinGEPanel extends PluginPanel {
 
     private JPanel buildOfferRow(GeOfferState offer) {
         JPanel row = createRowCard(OFFER_ROW_HEIGHT);
-        row.add(buildTitleLine(trim(offer.itemName, 22), buildBadge(offer.offerType.toString(), badgeColorForType(offer.offerType.toString()))));
-        row.add(Box.createVerticalStrut(4));
+        row.add(buildTitleLine(trim(offer.itemName, 28), buildBadge(offer.offerType.toString(), badgeColorForType(offer.offerType.toString()))));
+        row.add(Box.createVerticalStrut(2));
         row.add(buildMainValueLabel(offer.state + "  @ " + formatQty(offer.price)));
         row.add(Box.createVerticalStrut(4));
         JProgressBar progressBar = new JProgressBar(0, Math.max(1, offer.totalQuantity));
@@ -320,42 +320,21 @@ public class GremlinGEPanel extends PluginPanel {
 
     private JPanel buildFlipRow(FlipRecommendation recommendation) {
         JPanel row = createRowCard(FLIP_ROW_HEIGHT);
-
-        JPanel top = new JPanel(new BorderLayout(8, 0));
-        top.setOpaque(false);
-
-        JPanel iconStub = new JPanel();
-        iconStub.setOpaque(true);
-        iconStub.setBackground(new Color(48, 48, 48));
-        iconStub.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70)));
-        iconStub.setPreferredSize(new Dimension(36, 36));
-        iconStub.setMinimumSize(new Dimension(36, 36));
-        iconStub.setMaximumSize(new Dimension(36, 36));
-
-        JPanel text = new JPanel();
-        text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
-        text.setOpaque(false);
-        text.add(buildTitleLine(trim(recommendation.candidate.name, 20), buildBadge(recommendation.candidate.volumeTag.toUpperCase(), badgeColorForVolume(recommendation.candidate.volumeTag))));
-        text.add(Box.createVerticalStrut(2));
-        text.add(buildMainValueLabel("Buy " + formatQty(recommendation.candidate.buy) + "  Sell " + formatQty(recommendation.candidate.sell)));
-        text.add(Box.createVerticalStrut(2));
-        text.add(buildMetaLabel("Left " + formatQty(recommendation.remainingLimit)));
-
-        JLabel margin = buildBigNumberLabel(formatQty(recommendation.candidate.margin) + " gp");
-        margin.setHorizontalAlignment(SwingConstants.RIGHT);
-
-        top.add(iconStub, BorderLayout.WEST);
-        top.add(text, BorderLayout.CENTER);
-        top.add(margin, BorderLayout.EAST);
-        row.add(top);
+        row.add(buildTitleLine(trim(recommendation.candidate.name, 26), buildBadge(recommendation.candidate.volumeTag.toUpperCase(), badgeColorForVolume(recommendation.candidate.volumeTag))));
+        row.add(Box.createVerticalStrut(2));
+        row.add(buildBigNumberLabel(formatQty(recommendation.candidate.margin) + " gp margin"));
+        row.add(Box.createVerticalStrut(2));
+        row.add(buildMainValueLabel("Buy " + formatQty(recommendation.candidate.buy) + "  Sell " + formatQty(recommendation.candidate.sell)));
+        row.add(Box.createVerticalStrut(2));
+        row.add(buildMetaLabel("Left " + formatQty(recommendation.remainingLimit)));
         return row;
     }
 
     private JPanel buildLimitRow(LimitStatus status) {
         JPanel row = createRowCard(LIMIT_ROW_HEIGHT);
-        row.add(buildTitleLine(trim(status.itemName, 22), null));
-        row.add(Box.createVerticalStrut(3));
-        row.add(buildMainValueLabel(formatQty(status.boughtInWindow) + "/" + formatQty(status.buyLimit) + "   (" + status.resetEta + ")"));
+        row.add(buildTitleLine(trim(status.itemName, 28), null));
+        row.add(Box.createVerticalStrut(2));
+        row.add(buildMainValueLabel(formatQty(status.boughtInWindow) + "/" + formatQty(status.buyLimit) + "  (" + status.resetEta + ")"));
         return row;
     }
 
@@ -381,7 +360,7 @@ public class GremlinGEPanel extends PluginPanel {
     private JLabel buildBigNumberLabel(String text) {
         JLabel label = new JLabel(text);
         label.setForeground(Color.WHITE);
-        label.setFont(label.getFont().deriveFont(Font.BOLD, 15f));
+        label.setFont(label.getFont().deriveFont(Font.BOLD, 14f));
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
         return label;
     }
@@ -421,7 +400,7 @@ public class GremlinGEPanel extends PluginPanel {
         panel.setOpaque(true);
         panel.setBackground(new Color(36, 36, 36));
         panel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.setBorder(new CompoundBorder(BorderFactory.createLineBorder(new Color(55, 55, 55)), new EmptyBorder(8, 8, 8, 8)));
+        panel.setBorder(new CompoundBorder(BorderFactory.createLineBorder(new Color(55, 55, 55)), new EmptyBorder(6, 8, 6, 8)));
         panel.setMinimumSize(new Dimension(0, rowHeight));
         panel.setPreferredSize(new Dimension(0, rowHeight));
         panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowHeight));
