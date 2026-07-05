@@ -203,7 +203,9 @@ public class GremlinGEPanel extends PluginPanel {
 
     private JPanel buildOverviewCard() {
         JPanel card = createCardPanel();
-        card.add(createCardHeading("Overview"));
+        JLabel overviewHeading = createCardHeading("Overview");
+        overviewHeading.setAlignmentX(Component.CENTER_ALIGNMENT);
+        card.add(overviewHeading);
         card.add(Box.createVerticalStrut(6));
 
         configureOverviewLabel(overviewLine1);
@@ -455,7 +457,8 @@ public class GremlinGEPanel extends PluginPanel {
     }
 
     private void configureOverviewLabel(JLabel label) {
-        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        label.setAlignmentX(Component.CENTER_ALIGNMENT);
+        label.setHorizontalAlignment(SwingConstants.CENTER);
         label.setForeground(Color.WHITE);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 12f));
     }
