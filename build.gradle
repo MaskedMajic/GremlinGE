@@ -38,7 +38,7 @@ application {
 tasks.named('run', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = pluginLauncherClass
-    jvmArgs '-ea'
+    jvmArgs '-ea', '--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED'
     args '--developer-mode', '--debug'
 }
 
