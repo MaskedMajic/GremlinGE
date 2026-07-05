@@ -32,24 +32,23 @@ import net.runelite.client.ui.PluginPanel;
 
 public class GremlinGEPanel extends PluginPanel {
     private static final int CARD_GAP = 8;
-    private static final int CONTENT_HEIGHT = 278;
+    private static final int CONTENT_HEIGHT = 296;
 
     private static final String TAB_OFFERS = "offers";
     private static final String TAB_FLIPS = "flips";
     private static final String TAB_EVENTS = "events";
     private static final String TAB_LIMITS = "limits";
-    private static final String TAB_PROFIT = "profit";
 
     private final JLabel titleLabel = new JLabel("GremlinGE");
     private final JLabel subtitleLabel = new JLabel("GE helper");
     private final JLabel overviewLine1 = new JLabel("Open: 0   Active: 0");
     private final JLabel overviewLine2 = new JLabel("Partial: 0   Done: 0");
+    private final JLabel profitHeadline = new JLabel("P/L: 0 gp");
 
     private final JPanel offersList = createListPanel();
     private final JPanel flipsList = createListPanel();
     private final JPanel eventsList = createListPanel();
     private final JPanel limitsList = createListPanel();
-    private final JPanel profitList = createListPanel();
 
     private final CardLayout sectionCards = new CardLayout();
     private final JPanel sectionCardPanel = new JPanel(sectionCards);
@@ -82,13 +81,11 @@ public class GremlinGEPanel extends PluginPanel {
         configureActionButton(resetProfitButton);
         workspaceActions.setOpaque(false);
         workspaceActions.add(resetFlipsButton);
-        workspaceActions.add(resetProfitButton);
 
         setPlaceholder(offersList, "Waiting for live GE offers...");
         setPlaceholder(flipsList, "Waiting for scanner-backed suggestions...");
         setPlaceholder(eventsList, "No GE events recorded yet.");
         setPlaceholder(limitsList, "No active limit usage tracked yet.");
-        setPlaceholder(profitList, "No profit data yet.");
     }
 
     public void updateSummary(List<GeOfferState> offers) {
@@ -191,14 +188,14 @@ public class GremlinGEPanel extends PluginPanel {
     }
 
     public void updateProfit(ProfitSummary summary) {
-        resetList(profitList);
         if (summary == null) {
-            setPlaceholder(profitList, "No profit data yet.");
-            refreshList(profitList);
+            profitHeadline.setText("P/L: 0 gp");
+            profitHeadline.setForeground(Color.WHITE);
             return;
         }
-        profitList.add(buildProfitRow(summary));
-        refreshList(profitList);
+
+        profitHeadline.setText("P/L: " + formatSigned(summary.realizedProfit) + " gp");
+        profitHeadline.setForeground(summary.realizedProfit >= 0 ? new Color(100, 220, 120) : new Color(220, 100, 100));
     }
 
     public JButton getResetFlipsButton() {
@@ -234,6 +231,14 @@ public class GremlinGEPanel extends PluginPanel {
         card.add(overviewLine1);
         card.add(Box.createVerticalStrut(2));
         card.add(overviewLine2);
+        card.add(Box.createVerticalStrut(8));
+
+        profitHeadline.setAlignmentX(Component.LEFT_ALIGNMENT);
+        profitHeadline.setFont(profitHeadline.getFont().deriveFont(Font.BOLD, 15f));
+        profitHeadline.setForeground(Color.WHITE);
+        card.add(profitHeadline);
+        card.add(Box.createVerticalStrut(6));
+        card.add(resetProfitButton);
         return card;
     }
 
@@ -255,7 +260,6 @@ public class GremlinGEPanel extends PluginPanel {
         sectionCardPanel.add(createScrollPane(flipsList), TAB_FLIPS);
         sectionCardPanel.add(createScrollPane(eventsList), TAB_EVENTS);
         sectionCardPanel.add(createScrollPane(limitsList), TAB_LIMITS);
-        sectionCardPanel.add(createScrollPane(profitList), TAB_PROFIT);
         sectionCards.show(sectionCardPanel, activeTab);
         updateWorkspaceChrome();
 
@@ -271,7 +275,6 @@ public class GremlinGEPanel extends PluginPanel {
         addTabButton(bar, TAB_FLIPS, "Flips");
         addTabButton(bar, TAB_EVENTS, "Events");
         addTabButton(bar, TAB_LIMITS, "Limits");
-        addTabButton(bar, TAB_PROFIT, "Profit");
         refreshTabStyles();
         return bar;
     }
@@ -280,8 +283,8 @@ public class GremlinGEPanel extends PluginPanel {
         JButton button = new JButton(label);
         button.setFocusPainted(false);
         button.setAlignmentY(Component.CENTER_ALIGNMENT);
-        button.setMaximumSize(new Dimension(68, 26));
-        button.setPreferredSize(new Dimension(68, 26));
+        button.setMaximumSize(new Dimension(82, 26));
+        button.setPreferredSize(new Dimension(82, 26));
         button.setFont(button.getFont().deriveFont(Font.BOLD, 10f));
         button.addActionListener(e -> switchTab(key));
         tabButtons.put(key, button);
@@ -309,7 +312,6 @@ public class GremlinGEPanel extends PluginPanel {
 
     private void updateWorkspaceChrome() {
         resetFlipsButton.setVisible(TAB_FLIPS.equals(activeTab));
-        resetProfitButton.setVisible(TAB_PROFIT.equals(activeTab));
 
         if (TAB_OFFERS.equals(activeTab)) {
             workspaceSubtitle.setText("Offers and progress");
@@ -317,10 +319,8 @@ public class GremlinGEPanel extends PluginPanel {
             workspaceSubtitle.setText("Best candidates");
         } else if (TAB_EVENTS.equals(activeTab)) {
             workspaceSubtitle.setText("Latest changes");
-        } else if (TAB_LIMITS.equals(activeTab)) {
-            workspaceSubtitle.setText("Usage and resets");
         } else {
-            workspaceSubtitle.setText("Tracked totals");
+            workspaceSubtitle.setText("Usage and resets");
         }
 
         workspaceActions.revalidate();
@@ -347,6 +347,8 @@ public class GremlinGEPanel extends PluginPanel {
         row.add(buildTitleLine(trim(recommendation.candidate.name, 20), buildBadge(recommendation.candidate.volumeTag.toUpperCase(), badgeColorForVolume(recommendation.candidate.volumeTag))));
         row.add(Box.createVerticalStrut(4));
         row.add(buildBigNumberLabel(formatQty(recommendation.candidate.margin) + " gp"));
+        row.add(Box.createVerticalStrut(2));
+        row.add(buildMainValueLabel("Buy " + formatQty(recommendation.candidate.buy) + "   Sell " + formatQty(recommendation.candidate.sell)));
         row.add(Box.createVerticalStrut(2));
         row.add(buildMetaLabel("Left " + formatQty(recommendation.remainingLimit)));
         return row;
@@ -375,20 +377,6 @@ public class GremlinGEPanel extends PluginPanel {
         row.add(progressBar);
         row.add(Box.createVerticalStrut(4));
         row.add(buildMetaLabel("Reset " + status.resetEta));
-        return row;
-    }
-
-    private JPanel buildProfitRow(ProfitSummary summary) {
-        JPanel row = createRowCard();
-        JLabel big = new JLabel(formatSigned(summary.realizedProfit) + " gp");
-        big.setForeground(summary.realizedProfit >= 0 ? new Color(100, 220, 120) : new Color(220, 100, 100));
-        big.setFont(big.getFont().deriveFont(Font.BOLD, 18f));
-        big.setAlignmentX(Component.LEFT_ALIGNMENT);
-        row.add(big);
-        row.add(Box.createVerticalStrut(4));
-        row.add(buildMainValueLabel("Buys " + formatQty(summary.totalBuys) + "   Sells " + formatQty(summary.totalSells)));
-        row.add(Box.createVerticalStrut(4));
-        row.add(buildMetaLabel("In " + formatQty(summary.grossBuyValue) + "   Out " + formatQty(summary.grossSellValue)));
         return row;
     }
 
@@ -510,6 +498,8 @@ public class GremlinGEPanel extends PluginPanel {
         button.setBackground(new Color(58, 58, 58));
         button.setForeground(Color.WHITE);
         button.setBorder(BorderFactory.createLineBorder(new Color(82, 82, 82)));
+        button.setAlignmentX(Component.LEFT_ALIGNMENT);
+        button.setMaximumSize(new Dimension(110, 24));
     }
 
     private Color badgeColorForType(String type) { return "BUY".equalsIgnoreCase(type) ? new Color(66, 135, 245) : new Color(196, 96, 76); }
