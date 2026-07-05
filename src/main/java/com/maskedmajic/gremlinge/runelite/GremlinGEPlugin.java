@@ -228,23 +228,33 @@ public class GremlinGEPlugin extends Plugin {
             case "100k-1m":
                 settings.minPrice = 100_001;
                 settings.maxPrice = 1_000_000;
+                loosenForHigherBands(settings);
                 break;
             case "1m-10m":
                 settings.minPrice = 1_000_001;
                 settings.maxPrice = 10_000_000;
+                loosenForHigherBands(settings);
                 break;
             case "10m-50m":
                 settings.minPrice = 10_000_001;
                 settings.maxPrice = 50_000_000;
+                loosenForHigherBands(settings);
                 break;
             case "50m+":
                 settings.minPrice = 50_000_001;
                 settings.maxPrice = Integer.MAX_VALUE;
+                loosenForHigherBands(settings);
                 break;
             default:
                 break;
         }
         return settings;
+    }
+
+    private void loosenForHigherBands(Settings settings) {
+        settings.highVolumeOnly = false;
+        settings.minVolume5m = Math.max(100, settings.minVolume5m / 4);
+        settings.minMargin = Math.max(1, settings.minMargin / 2);
     }
 
     private void loadRecentEvents() {
