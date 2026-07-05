@@ -19,6 +19,7 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
@@ -53,9 +54,16 @@ public class GremlinGEPanel extends PluginPanel {
     private final CardLayout sectionCards = new CardLayout();
     private final JPanel sectionCardPanel = new JPanel(sectionCards);
     private final Map<String, JButton> tabButtons = new LinkedHashMap<String, JButton>();
-    private final JLabel workspaceSubtitle = new JLabel("Offers and progress");
+    private final JComboBox<String> tierDropdown = new JComboBox<>(new String[] {
+        "All",
+        "0-100k",
+        "100k-1m",
+        "1m-10m",
+        "10m-50m",
+        "50m+"
+    });
     private final JPanel workspaceActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-    private final JButton resetFlipsButton = new JButton("Reset Flips");
+    private final JButton refreshFlipsButton = new JButton("Refresh Flips");
     private final JButton resetProfitButton = new JButton("Reset Profit");
     private String activeTab = TAB_OFFERS;
 
@@ -77,10 +85,11 @@ public class GremlinGEPanel extends PluginPanel {
 
         add(content, BorderLayout.CENTER);
 
-        configureActionButton(resetFlipsButton);
+        configureActionButton(refreshFlipsButton);
         configureActionButton(resetProfitButton);
+        configureDropdown(tierDropdown);
         workspaceActions.setOpaque(false);
-        workspaceActions.add(resetFlipsButton);
+        workspaceActions.add(refreshFlipsButton);
 
         setPlaceholder(offersList, "Waiting for live GE offers...");
         setPlaceholder(flipsList, "Waiting for scanner-backed suggestions...");
@@ -178,12 +187,16 @@ public class GremlinGEPanel extends PluginPanel {
         profitHeadline.setForeground(summary.realizedProfit >= 0 ? new Color(100, 220, 120) : new Color(220, 100, 100));
     }
 
-    public JButton getResetFlipsButton() {
-        return resetFlipsButton;
+    public JButton getRefreshFlipsButton() {
+        return refreshFlipsButton;
     }
 
     public JButton getResetProfitButton() {
         return resetProfitButton;
+    }
+
+    public JComboBox<String> getTierDropdown() {
+        return tierDropdown;
     }
 
     private JPanel buildHeaderCard() {
@@ -203,9 +216,7 @@ public class GremlinGEPanel extends PluginPanel {
 
     private JPanel buildOverviewCard() {
         JPanel card = createCardPanel();
-        JLabel overviewHeading = createCardHeading("Overview");
-        overviewHeading.setAlignmentX(Component.CENTER_ALIGNMENT);
-        card.add(overviewHeading);
+        card.add(createCardHeading("Overview"));
         card.add(Box.createVerticalStrut(6));
 
         configureOverviewLabel(overviewLine1);
@@ -215,28 +226,20 @@ public class GremlinGEPanel extends PluginPanel {
         card.add(overviewLine2);
         card.add(Box.createVerticalStrut(8));
 
-        profitHeadline.setAlignmentX(Component.CENTER_ALIGNMENT);
-        profitHeadline.setHorizontalAlignment(SwingConstants.CENTER);
+        profitHeadline.setAlignmentX(Component.LEFT_ALIGNMENT);
         profitHeadline.setFont(profitHeadline.getFont().deriveFont(Font.BOLD, 15f));
         profitHeadline.setForeground(Color.WHITE);
         card.add(profitHeadline);
         card.add(Box.createVerticalStrut(6));
-
-        JPanel resetProfitWrap = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
-        resetProfitWrap.setOpaque(false);
-        resetProfitWrap.setAlignmentX(Component.CENTER_ALIGNMENT);
-        resetProfitWrap.add(resetProfitButton);
-        card.add(resetProfitWrap);
+        card.add(resetProfitButton);
         return card;
     }
 
     private JPanel buildTabbedSectionCard() {
         JPanel card = createCardPanel();
-        card.add(createCardHeading("Workspace"));
-        workspaceSubtitle.setForeground(Color.LIGHT_GRAY);
-        workspaceSubtitle.setFont(workspaceSubtitle.getFont().deriveFont(Font.PLAIN, 11f));
-        workspaceSubtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
-        card.add(workspaceSubtitle);
+        card.add(createCardHeading("Tier Filter"));
+        card.add(Box.createVerticalStrut(6));
+        card.add(tierDropdown);
         card.add(Box.createVerticalStrut(8));
         card.add(buildTabBar());
         card.add(Box.createVerticalStrut(6));
@@ -297,16 +300,7 @@ public class GremlinGEPanel extends PluginPanel {
     }
 
     private void updateWorkspaceChrome() {
-        resetFlipsButton.setVisible(TAB_FLIPS.equals(activeTab));
-
-        if (TAB_OFFERS.equals(activeTab)) {
-            workspaceSubtitle.setText("Offers and progress");
-        } else if (TAB_FLIPS.equals(activeTab)) {
-            workspaceSubtitle.setText("Best candidates");
-        } else {
-            workspaceSubtitle.setText("Tracked limits");
-        }
-
+        refreshFlipsButton.setVisible(TAB_FLIPS.equals(activeTab));
         workspaceActions.revalidate();
         workspaceActions.repaint();
     }
@@ -335,13 +329,6 @@ public class GremlinGEPanel extends PluginPanel {
         row.add(buildMainValueLabel("Buy " + formatQty(recommendation.candidate.buy) + "  Sell " + formatQty(recommendation.candidate.sell)));
         row.add(Box.createVerticalStrut(2));
         row.add(buildMetaLabel("Left " + formatQty(recommendation.remainingLimit)));
-        for (Component component : row.getComponents()) {
-            if (component instanceof JPanel) {
-                ((JPanel) component).setAlignmentX(Component.LEFT_ALIGNMENT);
-            } else if (component instanceof JLabel) {
-                ((JLabel) component).setAlignmentX(Component.LEFT_ALIGNMENT);
-            }
-        }
         return row;
     }
 
@@ -463,8 +450,7 @@ public class GremlinGEPanel extends PluginPanel {
     }
 
     private void configureOverviewLabel(JLabel label) {
-        label.setAlignmentX(Component.CENTER_ALIGNMENT);
-        label.setHorizontalAlignment(SwingConstants.CENTER);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
         label.setForeground(Color.WHITE);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 12f));
     }
@@ -476,7 +462,16 @@ public class GremlinGEPanel extends PluginPanel {
         button.setForeground(Color.WHITE);
         button.setBorder(BorderFactory.createLineBorder(new Color(82, 82, 82)));
         button.setAlignmentX(Component.LEFT_ALIGNMENT);
-        button.setMaximumSize(new Dimension(110, 24));
+        button.setMaximumSize(new Dimension(120, 24));
+    }
+
+    private void configureDropdown(JComboBox<String> dropdown) {
+        dropdown.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
+        dropdown.setPreferredSize(new Dimension(PluginPanel.PANEL_WIDTH - 32, 26));
+        dropdown.setAlignmentX(Component.LEFT_ALIGNMENT);
+        dropdown.setBackground(new Color(52, 52, 52));
+        dropdown.setForeground(Color.WHITE);
+        dropdown.setFocusable(false);
     }
 
     private Color badgeColorForType(String type) { return "BUY".equalsIgnoreCase(type) ? new Color(66, 135, 245) : new Color(196, 96, 76); }

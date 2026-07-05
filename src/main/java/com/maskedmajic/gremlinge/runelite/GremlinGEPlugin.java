@@ -20,6 +20,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import javax.swing.JComboBox;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.events.GrandExchangeOfferChanged;
@@ -60,6 +61,7 @@ public class GremlinGEPlugin extends Plugin {
     private final List<GeOfferEvent> recentEvents = new ArrayList<GeOfferEvent>();
 
     private NavigationButton navigationButton;
+    private boolean forceFlipRefresh;
 
     @Override
     protected void startUp() {
@@ -143,10 +145,13 @@ public class GremlinGEPlugin extends Plugin {
             refreshPanel(stateReader.readCurrentSnapshot(client, itemManager));
         });
 
-        panel.getResetFlipsButton().addActionListener(e -> {
+        panel.getRefreshFlipsButton().addActionListener(e -> {
             flipRecommendationService.clearCache();
+            forceFlipRefresh = true;
             refreshPanel(stateReader.readCurrentSnapshot(client, itemManager));
         });
+
+        panel.getTierDropdown().addActionListener(e -> refreshPanel(stateReader.readCurrentSnapshot(client, itemManager)));
     }
 
     private void refreshPanel(GeOfferSnapshot snapshot) {
@@ -167,16 +172,21 @@ public class GremlinGEPlugin extends Plugin {
 
         if (config.recommendationsEnabled()) {
             try {
-                Settings settings = ScannerSettingsLoader.load();
+                Settings settings = filteredSettings(ScannerSettingsLoader.load(), panel.getTierDropdown());
                 flipRecommendationService.setCacheTtlMillis(config.marketRefreshSeconds() * 1000L);
+                if (forceFlipRefresh) {
+                    flipRecommendationService.clearCache();
+                }
                 List<FlipRecommendation> recommendations = flipRecommendationService.recommend(
                     settings,
                     offers,
                     statuses,
                     Math.max(1, config.recommendationCount())
                 );
+                forceFlipRefresh = false;
                 panel.updateRecommendations(recommendations);
             } catch (Exception e) {
+                forceFlipRefresh = false;
                 panel.updateRecommendations(Collections.<FlipRecommendation>emptyList());
             }
         } else {
@@ -189,6 +199,44 @@ public class GremlinGEPlugin extends Plugin {
         } catch (Exception e) {
             panel.updateProfit(null);
         }
+    }
+
+    private Settings filteredSettings(Settings base, JComboBox<String> dropdown) {
+        Settings settings = new Settings();
+        settings.topN = base.topN;
+        settings.minMargin = base.minMargin;
+        settings.minVolume5m = base.minVolume5m;
+        settings.minPrice = base.minPrice;
+        settings.maxPrice = base.maxPrice;
+        settings.highVolumeOnly = base.highVolumeOnly;
+
+        Object selected = dropdown.getSelectedItem();
+        String tier = selected != null ? selected.toString() : "All";
+        switch (tier) {
+            case "0-100k":
+                settings.minPrice = 0;
+                settings.maxPrice = 100_000;
+                break;
+            case "100k-1m":
+                settings.minPrice = 100_001;
+                settings.maxPrice = 1_000_000;
+                break;
+            case "1m-10m":
+                settings.minPrice = 1_000_001;
+                settings.maxPrice = 10_000_000;
+                break;
+            case "10m-50m":
+                settings.minPrice = 10_000_001;
+                settings.maxPrice = 50_000_000;
+                break;
+            case "50m+":
+                settings.minPrice = 50_000_001;
+                settings.maxPrice = Integer.MAX_VALUE;
+                break;
+            default:
+                break;
+        }
+        return settings;
     }
 
     private void loadRecentEvents() {
