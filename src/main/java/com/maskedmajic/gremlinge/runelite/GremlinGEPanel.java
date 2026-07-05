@@ -9,6 +9,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
 import java.util.Collections;
@@ -18,8 +19,8 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
 import javax.swing.SwingConstants;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
@@ -27,13 +28,13 @@ import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
 /**
- * GremlinGE RuneLite panel with an overview-first, card-style layout.
+ * GremlinGE RuneLite panel with overview cards and component-based section rows.
  */
 public class GremlinGEPanel extends PluginPanel {
     private static final int CARD_GAP = 8;
-    private static final int SMALL_CARD_HEIGHT = 78;
-    private static final int MEDIUM_CARD_HEIGHT = 118;
-    private static final int LARGE_CARD_HEIGHT = 132;
+    private static final int SMALL_CARD_HEIGHT = 82;
+    private static final int MEDIUM_CARD_HEIGHT = 124;
+    private static final int LARGE_CARD_HEIGHT = 152;
 
     private final JLabel titleLabel = new JLabel("GremlinGE");
     private final JLabel subtitleLabel = new JLabel("GE helper");
@@ -43,11 +44,11 @@ public class GremlinGEPanel extends PluginPanel {
     private final JLabel partialValue = createStatValue("0");
     private final JLabel completeValue = createStatValue("0");
 
-    private final JTextArea offersArea = createTextArea("Waiting for live GE offers...\n");
-    private final JTextArea candidatesArea = createTextArea("Waiting for scanner-backed suggestions...\n");
-    private final JTextArea eventsArea = createTextArea("No GE events recorded yet.\n");
-    private final JTextArea limitsArea = createTextArea("No active limit usage tracked yet.\n");
-    private final JTextArea profitArea = createTextArea("No profit data yet.\n");
+    private final JPanel offersList = createListPanel();
+    private final JPanel flipsList = createListPanel();
+    private final JPanel eventsList = createListPanel();
+    private final JPanel limitsList = createListPanel();
+    private final JPanel profitList = createListPanel();
 
     public GremlinGEPanel() {
         super(false);
@@ -63,21 +64,27 @@ public class GremlinGEPanel extends PluginPanel {
         content.add(Box.createVerticalStrut(CARD_GAP));
         content.add(buildOverviewCard());
         content.add(Box.createVerticalStrut(CARD_GAP));
-        content.add(buildSectionCard("Active Offers", "Live slots", offersArea, LARGE_CARD_HEIGHT));
+        content.add(buildSectionCard("Active Offers", "Live slots", offersList, LARGE_CARD_HEIGHT));
         content.add(Box.createVerticalStrut(CARD_GAP));
-        content.add(buildSectionCard("Next Flips", "Best candidates", candidatesArea, LARGE_CARD_HEIGHT));
+        content.add(buildSectionCard("Next Flips", "Best candidates", flipsList, LARGE_CARD_HEIGHT));
         content.add(Box.createVerticalStrut(CARD_GAP));
-        content.add(buildSectionCard("Recent Events", "Latest changes", eventsArea, MEDIUM_CARD_HEIGHT));
+        content.add(buildSectionCard("Recent Events", "Latest changes", eventsList, MEDIUM_CARD_HEIGHT));
         content.add(Box.createVerticalStrut(CARD_GAP));
-        content.add(buildSectionCard("Buy Limits", "Usage + reset", limitsArea, MEDIUM_CARD_HEIGHT));
+        content.add(buildSectionCard("Buy Limits", "Usage + reset", limitsList, MEDIUM_CARD_HEIGHT));
         content.add(Box.createVerticalStrut(CARD_GAP));
-        content.add(buildSectionCard("Profit", "Tracked totals", profitArea, SMALL_CARD_HEIGHT));
+        content.add(buildSectionCard("Profit", "Tracked totals", profitList, SMALL_CARD_HEIGHT));
 
         JScrollPane scrollPane = new JScrollPane(content);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
         add(scrollPane, BorderLayout.CENTER);
+
+        setPlaceholder(offersList, "Waiting for live GE offers...");
+        setPlaceholder(flipsList, "Waiting for scanner-backed suggestions...");
+        setPlaceholder(eventsList, "No GE events recorded yet.");
+        setPlaceholder(limitsList, "No active limit usage tracked yet.");
+        setPlaceholder(profitList, "No profit data yet.");
     }
 
     public void updateSummary(List<GeOfferState> offers) {
@@ -114,141 +121,88 @@ public class GremlinGEPanel extends PluginPanel {
     }
 
     public void updateOffers(List<GeOfferState> offers) {
+        resetList(offersList);
         if (offers == null) {
             offers = Collections.emptyList();
         }
 
-        StringBuilder sb = new StringBuilder();
         for (GeOfferState offer : offers) {
             if (offer == null || offer.state == null || offer.isEmpty()) {
                 continue;
             }
-
-            sb.append("#")
-                .append(offer.slotIndex + 1)
-                .append(" ")
-                .append(trim(offer.itemName, 17))
-                .append("\n")
-                .append("  ")
-                .append(offer.offerType)
-                .append(" ")
-                .append(offer.state)
-                .append(" • ")
-                .append(formatQty(offer.filledQuantity))
-                .append("/")
-                .append(formatQty(offer.totalQuantity))
-                .append(" @ ")
-                .append(formatQty(offer.price))
-                .append("\n");
+            offersList.add(buildOfferRow(offer));
+            offersList.add(Box.createVerticalStrut(6));
         }
 
-        if (sb.length() == 0) {
-            sb.append("No active offers detected yet.\n");
+        if (offersList.getComponentCount() == 0) {
+            setPlaceholder(offersList, "No active offers detected yet.");
         }
-
-        offersArea.setText(sb.toString());
-        offersArea.setCaretPosition(0);
+        refreshList(offersList);
     }
 
     public void updateRecommendations(List<FlipRecommendation> recommendations) {
+        resetList(flipsList);
         if (recommendations == null || recommendations.isEmpty()) {
-            candidatesArea.setText("No scanner-backed flip suggestions available yet.\n");
+            setPlaceholder(flipsList, "No scanner-backed flip suggestions available yet.");
+            refreshList(flipsList);
             return;
         }
 
-        StringBuilder sb = new StringBuilder();
         for (FlipRecommendation recommendation : recommendations) {
             if (recommendation == null || recommendation.candidate == null) {
                 continue;
             }
-
-            sb.append(trim(recommendation.candidate.name, 18))
-                .append("\n")
-                .append("  margin ")
-                .append(formatQty(recommendation.candidate.margin))
-                .append(" • left ")
-                .append(formatQty(recommendation.remainingLimit))
-                .append(" • ")
-                .append(recommendation.candidate.volumeTag.toUpperCase())
-                .append("\n");
+            flipsList.add(buildFlipRow(recommendation));
+            flipsList.add(Box.createVerticalStrut(6));
         }
-
-        candidatesArea.setText(sb.toString());
-        candidatesArea.setCaretPosition(0);
+        refreshList(flipsList);
     }
 
     public void updateEvents(List<GeOfferEvent> events) {
+        resetList(eventsList);
         if (events == null || events.isEmpty()) {
-            eventsArea.setText("No GE events recorded yet.\n");
+            setPlaceholder(eventsList, "No GE events recorded yet.");
+            refreshList(eventsList);
             return;
         }
 
-        StringBuilder sb = new StringBuilder();
         int start = Math.max(0, events.size() - 8);
         for (int i = events.size() - 1; i >= start; i--) {
             GeOfferEvent event = events.get(i);
             if (event == null) {
                 continue;
             }
-
-            sb.append(event.type)
-                .append(" • #")
-                .append(event.slotIndex + 1)
-                .append(" • ")
-                .append(trim(event.itemName, 16));
-
-            if (event.deltaFilled > 0) {
-                sb.append(" • +").append(formatQty(event.deltaFilled));
-            }
-            if (event.newFilledQuantity > 0) {
-                sb.append(" • ").append(formatQty(event.newFilledQuantity));
-            }
-            sb.append("\n");
+            eventsList.add(buildEventRow(event));
+            eventsList.add(Box.createVerticalStrut(6));
         }
-        eventsArea.setText(sb.toString());
-        eventsArea.setCaretPosition(0);
+        refreshList(eventsList);
     }
 
     public void updateLimits(List<LimitStatus> statuses) {
+        resetList(limitsList);
         if (statuses == null || statuses.isEmpty()) {
-            limitsArea.setText("No active limit usage tracked yet.\n");
+            setPlaceholder(limitsList, "No active limit usage tracked yet.");
+            refreshList(limitsList);
             return;
         }
 
-        StringBuilder sb = new StringBuilder();
         for (LimitStatus status : statuses) {
-            sb.append(trim(status.itemName, 18))
-                .append("\n")
-                .append("  ")
-                .append(formatQty(status.boughtInWindow))
-                .append("/")
-                .append(formatQty(status.buyLimit))
-                .append(" used • left ")
-                .append(formatQty(status.remaining))
-                .append("\n")
-                .append("  reset ")
-                .append(status.resetEta)
-                .append("\n");
+            limitsList.add(buildLimitRow(status));
+            limitsList.add(Box.createVerticalStrut(6));
         }
-        limitsArea.setText(sb.toString());
-        limitsArea.setCaretPosition(0);
+        refreshList(limitsList);
     }
 
     public void updateProfit(ProfitSummary summary) {
+        resetList(profitList);
         if (summary == null) {
-            profitArea.setText("No profit data yet.\n");
+            setPlaceholder(profitList, "No profit data yet.");
+            refreshList(profitList);
             return;
         }
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("P/L  ").append(formatSigned(summary.realizedProfit)).append(" gp\n")
-            .append("Buys ").append(formatQty(summary.totalBuys))
-            .append(" • Sells ").append(formatQty(summary.totalSells)).append("\n")
-            .append("In ").append(formatQty(summary.grossBuyValue))
-            .append(" • Out ").append(formatQty(summary.grossSellValue)).append("\n");
-
-        profitArea.setText(sb.toString());
-        profitArea.setCaretPosition(0);
+        profitList.add(buildProfitRow(summary));
+        refreshList(profitList);
     }
 
     private JPanel buildHeaderCard() {
@@ -289,14 +243,14 @@ public class GremlinGEPanel extends PluginPanel {
         return card;
     }
 
-    private JPanel buildSectionCard(String title, String subtitle, JTextArea area, int height) {
+    private JPanel buildSectionCard(String title, String subtitle, JPanel listPanel, int height) {
         JPanel card = createCardPanel();
         JLabel heading = createCardHeading(title);
         JLabel subheading = createCardSubheading(subtitle);
         heading.setAlignmentX(Component.LEFT_ALIGNMENT);
         subheading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JScrollPane scrollPane = createScrollPane(area, height);
+        JScrollPane scrollPane = createScrollPane(listPanel, height);
         scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         card.add(heading);
@@ -304,6 +258,114 @@ public class GremlinGEPanel extends PluginPanel {
         card.add(Box.createVerticalStrut(8));
         card.add(scrollPane);
         return card;
+    }
+
+    private JPanel buildOfferRow(GeOfferState offer) {
+        JPanel row = createRowCard();
+        row.add(buildTitleLine(trim(offer.itemName, 22), buildBadge(offer.offerType.toString(), badgeColorForType(offer.offerType.toString()))));
+        row.add(Box.createVerticalStrut(4));
+        row.add(buildMetaLabel(offer.state + " • @ " + formatQty(offer.price)));
+        row.add(Box.createVerticalStrut(4));
+
+        JProgressBar progressBar = new JProgressBar(0, Math.max(1, offer.totalQuantity));
+        progressBar.setValue(Math.min(offer.filledQuantity, Math.max(1, offer.totalQuantity)));
+        progressBar.setStringPainted(true);
+        progressBar.setString(formatQty(offer.filledQuantity) + "/" + formatQty(offer.totalQuantity));
+        progressBar.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.add(progressBar);
+        return row;
+    }
+
+    private JPanel buildFlipRow(FlipRecommendation recommendation) {
+        JPanel row = createRowCard();
+        row.add(buildTitleLine(trim(recommendation.candidate.name, 20), buildBadge(recommendation.candidate.volumeTag.toUpperCase(), badgeColorForVolume(recommendation.candidate.volumeTag))));
+        row.add(Box.createVerticalStrut(4));
+        row.add(buildMetaLabel("Margin " + formatQty(recommendation.candidate.margin) + " gp • Left " + formatQty(recommendation.remainingLimit)));
+        row.add(Box.createVerticalStrut(4));
+        row.add(buildMetaLabel("Buy " + formatQty(recommendation.candidate.buy) + " • Sell " + formatQty(recommendation.candidate.sell)));
+        return row;
+    }
+
+    private JPanel buildEventRow(GeOfferEvent event) {
+        JPanel row = createRowCard();
+        row.add(buildTitleLine(trim(event.itemName, 20), buildBadge(event.type.toString(), badgeColorForEvent(event.type.toString()))));
+        row.add(Box.createVerticalStrut(4));
+        StringBuilder meta = new StringBuilder();
+        meta.append("Slot #").append(event.slotIndex + 1);
+        if (event.deltaFilled > 0) {
+            meta.append(" • +").append(formatQty(event.deltaFilled));
+        }
+        if (event.newFilledQuantity > 0) {
+            meta.append(" • total ").append(formatQty(event.newFilledQuantity));
+        }
+        row.add(buildMetaLabel(meta.toString()));
+        return row;
+    }
+
+    private JPanel buildLimitRow(LimitStatus status) {
+        JPanel row = createRowCard();
+        row.add(buildTitleLine(trim(status.itemName, 20), buildBadge("LEFT " + formatQty(status.remaining), new Color(80, 130, 70))));
+        row.add(Box.createVerticalStrut(4));
+        row.add(buildMetaLabel(formatQty(status.boughtInWindow) + "/" + formatQty(status.buyLimit) + " used"));
+        row.add(Box.createVerticalStrut(4));
+
+        JProgressBar progressBar = new JProgressBar(0, Math.max(1, status.buyLimit));
+        progressBar.setValue(Math.min(status.boughtInWindow, Math.max(1, status.buyLimit)));
+        progressBar.setStringPainted(false);
+        progressBar.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.add(progressBar);
+        row.add(Box.createVerticalStrut(4));
+        row.add(buildMetaLabel("Reset " + status.resetEta));
+        return row;
+    }
+
+    private JPanel buildProfitRow(ProfitSummary summary) {
+        JPanel row = createRowCard();
+
+        JLabel big = new JLabel(formatSigned(summary.realizedProfit) + " gp");
+        big.setForeground(summary.realizedProfit >= 0 ? new Color(100, 220, 120) : new Color(220, 100, 100));
+        big.setFont(big.getFont().deriveFont(Font.BOLD, 18f));
+        big.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.add(big);
+        row.add(Box.createVerticalStrut(4));
+        row.add(buildMetaLabel("Buys " + formatQty(summary.totalBuys) + " • Sells " + formatQty(summary.totalSells)));
+        row.add(Box.createVerticalStrut(4));
+        row.add(buildMetaLabel("In " + formatQty(summary.grossBuyValue) + " • Out " + formatQty(summary.grossSellValue)));
+        return row;
+    }
+
+    private JPanel buildTitleLine(String title, JLabel badge) {
+        JPanel line = new JPanel(new BorderLayout(6, 0));
+        line.setOpaque(false);
+        line.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 13f));
+
+        line.add(titleLabel, BorderLayout.CENTER);
+        if (badge != null) {
+            line.add(badge, BorderLayout.EAST);
+        }
+        return line;
+    }
+
+    private JLabel buildMetaLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setForeground(Color.LIGHT_GRAY);
+        label.setFont(label.getFont().deriveFont(Font.PLAIN, 11f));
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return label;
+    }
+
+    private JLabel buildBadge(String text, Color background) {
+        JLabel badge = new JLabel(text);
+        badge.setOpaque(true);
+        badge.setBackground(background);
+        badge.setForeground(Color.WHITE);
+        badge.setFont(badge.getFont().deriveFont(Font.BOLD, 10f));
+        badge.setBorder(new EmptyBorder(2, 6, 2, 6));
+        return badge;
     }
 
     private JPanel createCardPanel() {
@@ -318,6 +380,47 @@ public class GremlinGEPanel extends PluginPanel {
         ));
         panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
         return panel;
+    }
+
+    private JPanel createRowCard() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setOpaque(true);
+        panel.setBackground(new Color(36, 36, 36));
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.setBorder(new CompoundBorder(
+            BorderFactory.createLineBorder(new Color(55, 55, 55)),
+            new EmptyBorder(8, 8, 8, 8)
+        ));
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        return panel;
+    }
+
+    private JPanel createListPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setOpaque(true);
+        panel.setBackground(new Color(34, 34, 34));
+        return panel;
+    }
+
+    private void setPlaceholder(JPanel panel, String text) {
+        resetList(panel);
+        JLabel label = new JLabel(text);
+        label.setForeground(Color.LIGHT_GRAY);
+        label.setBorder(new EmptyBorder(8, 8, 8, 8));
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(label);
+        refreshList(panel);
+    }
+
+    private void resetList(JPanel panel) {
+        panel.removeAll();
+    }
+
+    private void refreshList(JPanel panel) {
+        panel.revalidate();
+        panel.repaint();
     }
 
     private JLabel createCardHeading(String text) {
@@ -364,26 +467,45 @@ public class GremlinGEPanel extends PluginPanel {
         return label;
     }
 
-    private JTextArea createTextArea(String initialText) {
-        JTextArea area = new JTextArea(initialText);
-        area.setEditable(false);
-        area.setLineWrap(true);
-        area.setWrapStyleWord(true);
-        area.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        area.setForeground(Color.WHITE);
-        area.setBackground(new Color(34, 34, 34));
-        area.setBorder(new EmptyBorder(6, 6, 6, 6));
-        return area;
-    }
-
-    private JScrollPane createScrollPane(JTextArea area, int height) {
-        JScrollPane scrollPane = new JScrollPane(area);
+    private JScrollPane createScrollPane(JPanel listPanel, int height) {
+        JScrollPane scrollPane = new JScrollPane(listPanel);
         scrollPane.setBorder(BorderFactory.createLineBorder(new Color(58, 58, 58)));
         scrollPane.setPreferredSize(new Dimension(PluginPanel.PANEL_WIDTH - 24, height));
         scrollPane.setMinimumSize(new Dimension(PluginPanel.PANEL_WIDTH - 24, height));
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.getViewport().setBackground(new Color(34, 34, 34));
+        scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
         return scrollPane;
+    }
+
+    private Color badgeColorForType(String type) {
+        return "BUY".equalsIgnoreCase(type) ? new Color(66, 135, 245) : new Color(196, 96, 76);
+    }
+
+    private Color badgeColorForVolume(String tag) {
+        if ("high".equalsIgnoreCase(tag)) {
+            return new Color(78, 138, 76);
+        }
+        if ("med".equalsIgnoreCase(tag)) {
+            return new Color(177, 128, 53);
+        }
+        return new Color(92, 92, 92);
+    }
+
+    private Color badgeColorForEvent(String type) {
+        if (type.contains("COMPLETE")) {
+            return new Color(78, 138, 76);
+        }
+        if (type.contains("CANCEL")) {
+            return new Color(179, 74, 74);
+        }
+        if (type.contains("PARTIAL")) {
+            return new Color(177, 128, 53);
+        }
+        if (type.contains("PLACED")) {
+            return new Color(66, 135, 245);
+        }
+        return new Color(92, 92, 92);
     }
 
     private String trim(String value, int max) {
