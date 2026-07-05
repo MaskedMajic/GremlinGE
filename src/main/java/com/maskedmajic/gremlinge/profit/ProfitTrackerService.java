@@ -97,15 +97,22 @@ public class ProfitTrackerService {
                 summary.totalBuys += fill.quantity;
                 summary.grossBuyValue += value;
             } else {
+                long tax = estimateSellTax(fill.price) * (long) fill.quantity;
                 summary.totalSells += fill.quantity;
                 summary.grossSellValue += value;
+                summary.sellTax += tax;
             }
         }
-        summary.realizedProfit = summary.grossSellValue - summary.grossBuyValue;
+        summary.netSellValue = summary.grossSellValue - summary.sellTax;
+        summary.realizedProfit = summary.netSellValue - summary.grossBuyValue;
         return summary;
     }
 
     public void reset() throws IOException {
         saveFills(new ArrayList<FillRecord>());
+    }
+
+    private long estimateSellTax(int sellPrice) {
+        return (long) Math.floor(sellPrice * 0.02d);
     }
 }

@@ -60,8 +60,10 @@ public class MarketDataService {
 
             int high = latestRow.get("high").getAsInt();
             int low = latestRow.get("low").getAsInt();
-            int margin = high - low;
-            if (margin < settings.minMargin) {
+            int grossMargin = high - low;
+            int tax = estimateGeTax(high);
+            int netMargin = high - tax - low;
+            if (netMargin < settings.minMargin) {
                 continue;
             }
             if (low < settings.minPrice || low > settings.maxPrice) {
@@ -78,7 +80,7 @@ public class MarketDataService {
             int limit = item.has("limit") && !item.get("limit").isJsonNull() ? item.get("limit").getAsInt() : 0;
             String name = item.get("name").getAsString();
             String volumeTag = classifyVolume(totalVol);
-            results.add(new FlipCandidate(name, low, high, margin, volumeTag, limit, totalVol));
+            results.add(new FlipCandidate(name, low, high, grossMargin, tax, netMargin, volumeTag, limit, totalVol));
         }
 
         cachedCandidates = new ArrayList<FlipCandidate>(results);
@@ -106,6 +108,10 @@ public class MarketDataService {
         if (totalVol >= 25000) return "high";
         if (totalVol >= 8000) return "med";
         return "low";
+    }
+
+    private int estimateGeTax(int sellPrice) {
+        return (int) Math.floor(sellPrice * 0.02d);
     }
 
     private JsonObject fetchJsonObject(String url) throws IOException, InterruptedException {

@@ -4,17 +4,21 @@ public class FlipCandidate {
     public final String name;
     public final int buy;
     public final int sell;
+    public final int grossMargin;
+    public final int tax;
     public final int margin;
     public final String volumeTag;
     public final int buyLimit;
     public final int volume5m;
     public final int score;
 
-    public FlipCandidate(String name, int buy, int sell, int margin, String volumeTag, int buyLimit, int volume5m) {
+    public FlipCandidate(String name, int buy, int sell, int grossMargin, int tax, int netMargin, String volumeTag, int buyLimit, int volume5m) {
         this.name = name;
         this.buy = buy;
         this.sell = sell;
-        this.margin = margin;
+        this.grossMargin = grossMargin;
+        this.tax = tax;
+        this.margin = netMargin;
         this.volumeTag = volumeTag;
         this.buyLimit = buyLimit;
         this.volume5m = volume5m;

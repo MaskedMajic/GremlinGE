@@ -324,11 +324,11 @@ public class GremlinGEPanel extends PluginPanel {
         JPanel row = createRowCard(FLIP_ROW_HEIGHT);
         row.add(buildTitleLine(trim(recommendation.candidate.name, 26), buildBadge(recommendation.candidate.volumeTag.toUpperCase(), badgeColorForVolume(recommendation.candidate.volumeTag))));
         row.add(Box.createVerticalStrut(2));
-        row.add(buildBigNumberLabel(formatQty(recommendation.candidate.margin) + " gp margin"));
+        row.add(buildBigNumberLabel(formatQty(recommendation.candidate.margin) + " gp net"));
         row.add(Box.createVerticalStrut(2));
         row.add(buildMainValueLabel("Buy " + formatQty(recommendation.candidate.buy) + "  Sell " + formatQty(recommendation.candidate.sell)));
         row.add(Box.createVerticalStrut(2));
-        row.add(buildMetaLabel("Left " + formatQty(recommendation.remainingLimit)));
+        row.add(buildMetaLabel("Gross " + formatQty(recommendation.candidate.grossMargin) + "  Tax " + formatQty(recommendation.candidate.tax) + "  Left " + formatQty(recommendation.remainingLimit)));
         return row;
     }
 
