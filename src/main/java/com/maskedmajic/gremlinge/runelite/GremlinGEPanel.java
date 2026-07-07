@@ -13,44 +13,66 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GridLayout;
 import java.awt.RenderingHints;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JProgressBar;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
+import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
 public class GremlinGEPanel extends PluginPanel {
     private static final int CARD_GAP = 8;
-    private static final int CONTENT_HEIGHT = 296;
+    private static final int CONTENT_HEIGHT = 280;
     private static final int OFFER_ROW_HEIGHT = 72;
     private static final int FLIP_ROW_HEIGHT = 72;
     private static final int LIMIT_ROW_HEIGHT = 48;
+    private static final int MAX_SUGGESTIONS = 8;
+    private static final Color CARD_BG = ColorScheme.DARKER_GRAY_COLOR;
+    private static final Color ROW_BG = new Color(36, 36, 36);
+    private static final Color LIST_BG = new Color(34, 34, 34);
+    private static final Color BORDER_COLOR = new Color(58, 58, 58);
+    private static final Color ACCENT_COLOR = new Color(66, 135, 245);
 
     private static final String TAB_OFFERS = "offers";
     private static final String TAB_FLIPS = "flips";
     private static final String TAB_LIMITS = "limits";
 
     private final JLabel titleLabel = new JLabel("GremlinGE");
-    private final JLabel subtitleLabel = new JLabel("GE helper");
-    private final JLabel overviewLine1 = new JLabel("Open: 0   Active: 0");
-    private final JLabel overviewLine2 = new JLabel("Partial: 0   Done: 0");
+    private final JLabel subtitleLabel = new JLabel("GE flip assistant");
+    private final JLabel openChipValue = new JLabel("0");
+    private final JLabel activeChipValue = new JLabel("0");
+    private final JLabel partialChipValue = new JLabel("0");
+    private final JLabel doneChipValue = new JLabel("0");
     private final JLabel profitHeadline = new JLabel("P/L: 0 gp");
 
     private final JPanel offersList = createListPanel();
@@ -60,7 +82,6 @@ public class GremlinGEPanel extends PluginPanel {
     private final CardLayout sectionCards = new CardLayout();
     private final JPanel sectionCardPanel = new JPanel(sectionCards);
     private final Map<String, JButton> tabButtons = new LinkedHashMap<String, JButton>();
-    private final JLabel workspaceSubtitle = new JLabel("Offers and progress");
     private final JPanel workspaceActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
     private final JButton refreshFlipsButton = new JButton("Refresh Flips");
     private final JButton resetProfitButton = new JButton("Reset Profit");
@@ -72,7 +93,21 @@ public class GremlinGEPanel extends PluginPanel {
         "10m-50m",
         "50m+"
     });
+
+    private final JTextField searchField = new JTextField();
+    private final DefaultListModel<String> suggestionModel = new DefaultListModel<>();
+    private final JList<String> suggestionList = new JList<>(suggestionModel);
+    private final JPopupMenu suggestionPopup = new JPopupMenu();
+
+    private List<FlipRecommendation> lastRecommendations = Collections.emptyList();
+    private FlipRecommendation searchResult;
+    private String searchedItemName;
+    private boolean searchLoading;
+    private boolean suppressSearchEvents;
     private String activeTab = TAB_OFFERS;
+
+    private Function<String, List<String>> suggestionProvider = query -> Collections.emptyList();
+    private Consumer<String> searchSelectionHandler = itemName -> { };
 
     public GremlinGEPanel() {
         super(false);
@@ -87,6 +122,8 @@ public class GremlinGEPanel extends PluginPanel {
         content.add(buildHeaderCard());
         content.add(Box.createVerticalStrut(CARD_GAP));
         content.add(buildOverviewCard());
+        content.add(Box.createVerticalStrut(CARD_GAP));
+        content.add(buildSearchCard());
         content.add(Box.createVerticalStrut(CARD_GAP));
         content.add(buildTabbedSectionCard());
 
@@ -130,8 +167,10 @@ public class GremlinGEPanel extends PluginPanel {
             }
         }
 
-        overviewLine1.setText("Open: " + openSlots + "   Active: " + activeOffers);
-        overviewLine2.setText("Partial: " + partialOffers + "   Done: " + completedOffers);
+        openChipValue.setText(String.valueOf(openSlots));
+        activeChipValue.setText(String.valueOf(activeOffers));
+        partialChipValue.setText(String.valueOf(partialOffers));
+        doneChipValue.setText(String.valueOf(completedOffers));
     }
 
     public void updateOffers(List<GeOfferState> offers) {
@@ -153,20 +192,8 @@ public class GremlinGEPanel extends PluginPanel {
     }
 
     public void updateRecommendations(List<FlipRecommendation> recommendations) {
-        resetList(flipsList);
-        if (recommendations == null || recommendations.isEmpty()) {
-            setPlaceholder(flipsList, "No scanner-backed flip suggestions available yet.");
-            refreshList(flipsList);
-            return;
-        }
-        for (FlipRecommendation recommendation : recommendations) {
-            if (recommendation == null || recommendation.candidate == null) {
-                continue;
-            }
-            flipsList.add(buildFlipRow(recommendation));
-            flipsList.add(Box.createVerticalStrut(6));
-        }
-        refreshList(flipsList);
+        lastRecommendations = recommendations != null ? recommendations : Collections.<FlipRecommendation>emptyList();
+        renderFlips();
     }
 
     public void updateLimits(List<LimitStatus> statuses) {
@@ -206,6 +233,38 @@ public class GremlinGEPanel extends PluginPanel {
         return tierDropdown;
     }
 
+    /** Called on the EDT with in-memory prefix/substring matches for the current search text. Keep this fast (no network). */
+    public void setSuggestionProvider(Function<String, List<String>> suggestionProvider) {
+        this.suggestionProvider = suggestionProvider != null ? suggestionProvider : query -> Collections.emptyList();
+    }
+
+    /** Called on the EDT when the user commits a search (click, or Enter). Do the actual lookup off-EDT. */
+    public void setSearchSelectionHandler(Consumer<String> searchSelectionHandler) {
+        this.searchSelectionHandler = searchSelectionHandler != null ? searchSelectionHandler : itemName -> { };
+    }
+
+    /** Must be called on the EDT once a background lookup for {@code itemName} completes successfully. */
+    public void showSearchResult(String itemName, FlipRecommendation recommendation) {
+        if (searchedItemName == null || !searchedItemName.equals(itemName)) {
+            return;
+        }
+        searchLoading = false;
+        searchResult = recommendation;
+        switchTab(TAB_FLIPS);
+        renderFlips();
+    }
+
+    /** Must be called on the EDT if a background lookup for {@code itemName} finds nothing or fails. */
+    public void showSearchError(String itemName) {
+        if (searchedItemName == null || !searchedItemName.equals(itemName)) {
+            return;
+        }
+        searchLoading = false;
+        searchResult = null;
+        switchTab(TAB_FLIPS);
+        renderFlips();
+    }
+
     private JPanel buildHeaderCard() {
         JPanel card = createCardPanel();
         titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -214,6 +273,7 @@ public class GremlinGEPanel extends PluginPanel {
 
         subtitleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         subtitleLabel.setForeground(Color.LIGHT_GRAY);
+        subtitleLabel.setFont(subtitleLabel.getFont().deriveFont(Font.PLAIN, 11f));
         subtitleLabel.setBorder(new EmptyBorder(2, 0, 0, 0));
 
         card.add(titleLabel);
@@ -223,17 +283,19 @@ public class GremlinGEPanel extends PluginPanel {
 
     private JPanel buildOverviewCard() {
         JPanel card = createCardPanel();
-        JLabel overviewHeading = createCardHeading("Overview");
-        overviewHeading.setAlignmentX(Component.CENTER_ALIGNMENT);
-        card.add(overviewHeading);
-        card.add(Box.createVerticalStrut(6));
-
-        configureOverviewLabel(overviewLine1);
-        configureOverviewLabel(overviewLine2);
-        card.add(overviewLine1);
-        card.add(Box.createVerticalStrut(2));
-        card.add(overviewLine2);
+        card.add(createCardHeading("Overview"));
         card.add(Box.createVerticalStrut(8));
+
+        JPanel statsGrid = new JPanel(new GridLayout(1, 4, 6, 0));
+        statsGrid.setOpaque(false);
+        statsGrid.setAlignmentX(Component.LEFT_ALIGNMENT);
+        statsGrid.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
+        statsGrid.add(buildStatChip(openChipValue, "OPEN"));
+        statsGrid.add(buildStatChip(activeChipValue, "ACTIVE"));
+        statsGrid.add(buildStatChip(partialChipValue, "PARTIAL"));
+        statsGrid.add(buildStatChip(doneChipValue, "DONE"));
+        card.add(statsGrid);
+        card.add(Box.createVerticalStrut(10));
 
         profitHeadline.setAlignmentX(Component.CENTER_ALIGNMENT);
         profitHeadline.setHorizontalAlignment(SwingConstants.CENTER);
@@ -248,6 +310,172 @@ public class GremlinGEPanel extends PluginPanel {
         resetProfitWrap.add(resetProfitButton);
         card.add(resetProfitWrap);
         return card;
+    }
+
+    private JPanel buildStatChip(JLabel valueLabel, String caption) {
+        JPanel chip = new JPanel();
+        chip.setLayout(new BoxLayout(chip, BoxLayout.Y_AXIS));
+        chip.setOpaque(true);
+        chip.setBackground(ROW_BG);
+        chip.setBorder(new CompoundBorder(BorderFactory.createLineBorder(BORDER_COLOR), new EmptyBorder(6, 2, 6, 2)));
+
+        valueLabel.setForeground(Color.WHITE);
+        valueLabel.setFont(valueLabel.getFont().deriveFont(Font.BOLD, 14f));
+        valueLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        valueLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel captionLabel = new JLabel(caption);
+        captionLabel.setForeground(new Color(150, 150, 150));
+        captionLabel.setFont(captionLabel.getFont().deriveFont(Font.PLAIN, 9f));
+        captionLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        captionLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        chip.add(valueLabel);
+        chip.add(Box.createVerticalStrut(2));
+        chip.add(captionLabel);
+        return chip;
+    }
+
+    private JPanel buildSearchCard() {
+        JPanel card = createCardPanel();
+        card.add(createCardHeading("Search"));
+        card.add(Box.createVerticalStrut(6));
+
+        searchField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
+        searchField.setBackground(new Color(28, 28, 28));
+        searchField.setForeground(Color.WHITE);
+        searchField.setCaretColor(Color.WHITE);
+        searchField.setBorder(new CompoundBorder(BorderFactory.createLineBorder(BORDER_COLOR), new EmptyBorder(2, 6, 2, 6)));
+        searchField.setToolTipText("Search any GE item by name");
+        searchField.setAlignmentX(Component.LEFT_ALIGNMENT);
+        searchField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent e) { onSearchTextChanged(); }
+            @Override public void removeUpdate(DocumentEvent e) { onSearchTextChanged(); }
+            @Override public void changedUpdate(DocumentEvent e) { onSearchTextChanged(); }
+        });
+        searchField.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                handleSearchKey(e);
+            }
+        });
+        card.add(searchField);
+
+        configureSuggestionList();
+        return card;
+    }
+
+    private void configureSuggestionList() {
+        suggestionList.setBackground(new Color(28, 28, 28));
+        suggestionList.setForeground(Color.WHITE);
+        suggestionList.setSelectionBackground(ACCENT_COLOR);
+        suggestionList.setSelectionForeground(Color.WHITE);
+        suggestionList.setFont(suggestionList.getFont().deriveFont(Font.PLAIN, 12f));
+        suggestionList.setFixedCellHeight(22);
+        suggestionList.setBorder(new EmptyBorder(2, 6, 2, 6));
+        suggestionList.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int index = suggestionList.locationToIndex(e.getPoint());
+                if (index >= 0) {
+                    commitSelection(suggestionModel.get(index));
+                }
+            }
+        });
+
+        suggestionPopup.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
+        suggestionPopup.setBackground(new Color(28, 28, 28));
+        suggestionPopup.add(suggestionList);
+        suggestionPopup.setFocusable(false);
+    }
+
+    private void onSearchTextChanged() {
+        if (suppressSearchEvents) {
+            return;
+        }
+
+        String rawQuery = currentQueryText();
+        if (searchedItemName != null && !searchedItemName.equalsIgnoreCase(rawQuery)) {
+            searchedItemName = null;
+            searchResult = null;
+            searchLoading = false;
+        }
+        renderFlips();
+
+        if (rawQuery.isEmpty()) {
+            hideSuggestions();
+            return;
+        }
+        showSuggestions(suggestionProvider.apply(rawQuery));
+    }
+
+    private void showSuggestions(List<String> matches) {
+        if (matches == null || matches.isEmpty()) {
+            hideSuggestions();
+            return;
+        }
+
+        suggestionModel.clear();
+        int limit = Math.min(matches.size(), MAX_SUGGESTIONS);
+        for (int i = 0; i < limit; i++) {
+            suggestionModel.addElement(matches.get(i));
+        }
+        suggestionList.setSelectedIndex(0);
+        suggestionPopup.setPreferredSize(new Dimension(Math.max(160, searchField.getWidth()), limit * 22 + 4));
+        suggestionPopup.setVisible(false);
+        suggestionPopup.show(searchField, 0, searchField.getHeight());
+    }
+
+    private void hideSuggestions() {
+        if (suggestionPopup.isVisible()) {
+            suggestionPopup.setVisible(false);
+        }
+    }
+
+    private void handleSearchKey(KeyEvent e) {
+        if (e.getKeyCode() == KeyEvent.VK_DOWN) {
+            if (suggestionPopup.isVisible() && !suggestionModel.isEmpty()) {
+                int next = Math.min(suggestionList.getSelectedIndex() + 1, suggestionModel.size() - 1);
+                suggestionList.setSelectedIndex(Math.max(next, 0));
+            }
+            e.consume();
+        } else if (e.getKeyCode() == KeyEvent.VK_UP) {
+            if (suggestionPopup.isVisible() && !suggestionModel.isEmpty()) {
+                int prev = Math.max(suggestionList.getSelectedIndex() - 1, 0);
+                suggestionList.setSelectedIndex(prev);
+            }
+            e.consume();
+        } else if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+            if (suggestionPopup.isVisible() && suggestionList.getSelectedIndex() >= 0) {
+                commitSelection(suggestionModel.get(suggestionList.getSelectedIndex()));
+            } else if (!currentQueryText().isEmpty()) {
+                commitSelection(currentQueryText());
+            }
+        } else if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+            hideSuggestions();
+        }
+    }
+
+    private void commitSelection(String itemName) {
+        hideSuggestions();
+        searchedItemName = itemName;
+        searchResult = null;
+        searchLoading = true;
+
+        suppressSearchEvents = true;
+        try {
+            searchField.setText(itemName);
+        } finally {
+            suppressSearchEvents = false;
+        }
+        renderFlips();
+
+        searchSelectionHandler.accept(itemName);
+    }
+
+    private String currentQueryText() {
+        String text = searchField.getText();
+        return text == null ? "" : text.trim();
     }
 
     private JPanel buildTabbedSectionCard() {
@@ -273,9 +501,10 @@ public class GremlinGEPanel extends PluginPanel {
     }
 
     private JPanel buildTabBar() {
-        JPanel bar = new JPanel();
-        bar.setLayout(new BoxLayout(bar, BoxLayout.X_AXIS));
+        JPanel bar = new JPanel(new GridLayout(1, 3, 4, 0));
         bar.setOpaque(false);
+        bar.setAlignmentX(Component.LEFT_ALIGNMENT);
+        bar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
         addTabButton(bar, TAB_OFFERS, "Offers");
         addTabButton(bar, TAB_FLIPS, "Flips");
         addTabButton(bar, TAB_LIMITS, "Limits");
@@ -286,14 +515,10 @@ public class GremlinGEPanel extends PluginPanel {
     private void addTabButton(JPanel bar, final String key, String label) {
         JButton button = new JButton(label);
         button.setFocusPainted(false);
-        button.setAlignmentY(Component.CENTER_ALIGNMENT);
-        button.setMaximumSize(new Dimension(96, 26));
-        button.setPreferredSize(new Dimension(96, 26));
         button.setFont(button.getFont().deriveFont(Font.BOLD, 10f));
         button.addActionListener(e -> switchTab(key));
         tabButtons.put(key, button);
         bar.add(button);
-        bar.add(Box.createHorizontalStrut(4));
     }
 
     private void switchTab(String key) {
@@ -307,7 +532,7 @@ public class GremlinGEPanel extends PluginPanel {
         for (Map.Entry<String, JButton> entry : tabButtons.entrySet()) {
             boolean selected = entry.getKey().equals(activeTab);
             JButton button = entry.getValue();
-            button.setBackground(selected ? new Color(66, 135, 245) : new Color(52, 52, 52));
+            button.setBackground(selected ? ACCENT_COLOR : new Color(52, 52, 52));
             button.setForeground(Color.WHITE);
             button.setOpaque(true);
             button.setBorder(BorderFactory.createLineBorder(selected ? new Color(94, 156, 255) : new Color(72, 72, 72)));
@@ -318,6 +543,77 @@ public class GremlinGEPanel extends PluginPanel {
         refreshFlipsButton.setVisible(TAB_FLIPS.equals(activeTab));
         workspaceActions.revalidate();
         workspaceActions.repaint();
+    }
+
+    private void renderFlips() {
+        resetList(flipsList);
+
+        String rawQuery = currentQueryText();
+        String query = rawQuery.toLowerCase();
+        boolean showingSearchResult = searchedItemName != null;
+
+        if (showingSearchResult) {
+            if (searchLoading) {
+                flipsList.add(buildSearchStatusRow("Searching \"" + trim(searchedItemName, 30) + "\"..."));
+            } else if (searchResult != null) {
+                flipsList.add(buildSearchResultRow(searchResult));
+            } else {
+                flipsList.add(buildSearchErrorRow(searchedItemName));
+            }
+            flipsList.add(Box.createVerticalStrut(10));
+        }
+
+        List<FlipRecommendation> filtered = new ArrayList<FlipRecommendation>();
+        for (FlipRecommendation recommendation : lastRecommendations) {
+            if (recommendation == null || recommendation.candidate == null) {
+                continue;
+            }
+            if (!query.isEmpty() && !recommendation.candidate.name.toLowerCase().contains(query)) {
+                continue;
+            }
+            if (showingSearchResult && recommendation.candidate.name.equalsIgnoreCase(searchedItemName)) {
+                continue;
+            }
+            filtered.add(recommendation);
+        }
+
+        for (FlipRecommendation recommendation : filtered) {
+            flipsList.add(buildFlipRow(recommendation));
+            flipsList.add(Box.createVerticalStrut(6));
+        }
+
+        if (filtered.isEmpty() && !showingSearchResult) {
+            String message = lastRecommendations.isEmpty()
+                ? "No scanner-backed flip suggestions available yet."
+                : "No flips match \"" + rawQuery + "\".";
+            setPlaceholder(flipsList, message);
+        }
+
+        refreshList(flipsList);
+    }
+
+    private JPanel buildSearchResultRow(FlipRecommendation recommendation) {
+        JPanel row = buildFlipRow(recommendation);
+        row.setBorder(new CompoundBorder(BorderFactory.createLineBorder(ACCENT_COLOR, 2), new EmptyBorder(6, 8, 6, 8)));
+        return row;
+    }
+
+    private JPanel buildSearchErrorRow(String itemName) {
+        return buildSearchStatusRow("No live price data for \"" + trim(itemName, 30) + "\"", new Color(196, 96, 76));
+    }
+
+    private JPanel buildSearchStatusRow(String text) {
+        return buildSearchStatusRow(text, BORDER_COLOR);
+    }
+
+    private JPanel buildSearchStatusRow(String text, Color borderColor) {
+        JPanel row = createRowCard(44);
+        row.setBorder(new CompoundBorder(BorderFactory.createLineBorder(borderColor, 2), new EmptyBorder(6, 8, 6, 8)));
+        JLabel label = new JLabel(text);
+        label.setForeground(Color.LIGHT_GRAY);
+        label.setFont(label.getFont().deriveFont(Font.PLAIN, 12f));
+        row.add(label);
+        return row;
     }
 
     private JPanel buildOfferRow(GeOfferState offer) {
@@ -416,9 +712,9 @@ public class GremlinGEPanel extends PluginPanel {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setOpaque(true);
-        panel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        panel.setBackground(CARD_BG);
         panel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.setBorder(new CompoundBorder(BorderFactory.createLineBorder(new Color(58, 58, 58)), new EmptyBorder(10, 10, 10, 10)));
+        panel.setBorder(new CompoundBorder(BorderFactory.createLineBorder(BORDER_COLOR), new EmptyBorder(10, 10, 10, 10)));
         panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
         return panel;
     }
@@ -427,7 +723,7 @@ public class GremlinGEPanel extends PluginPanel {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setOpaque(true);
-        panel.setBackground(new Color(36, 36, 36));
+        panel.setBackground(ROW_BG);
         panel.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.setBorder(new CompoundBorder(BorderFactory.createLineBorder(new Color(55, 55, 55)), new EmptyBorder(6, 8, 6, 8)));
         panel.setMinimumSize(new Dimension(0, rowHeight));
@@ -440,18 +736,18 @@ public class GremlinGEPanel extends PluginPanel {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setOpaque(true);
-        panel.setBackground(new Color(34, 34, 34));
+        panel.setBackground(LIST_BG);
         panel.setAlignmentX(Component.LEFT_ALIGNMENT);
         return panel;
     }
 
     private JScrollPane createScrollPane(JPanel panel) {
         JScrollPane scrollPane = new JScrollPane(panel);
-        scrollPane.setBorder(BorderFactory.createLineBorder(new Color(58, 58, 58)));
+        scrollPane.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
         scrollPane.setPreferredSize(new Dimension(PluginPanel.PANEL_WIDTH - 24, CONTENT_HEIGHT));
         scrollPane.setMinimumSize(new Dimension(PluginPanel.PANEL_WIDTH - 24, CONTENT_HEIGHT));
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scrollPane.getViewport().setBackground(new Color(34, 34, 34));
+        scrollPane.getViewport().setBackground(LIST_BG);
         styleScrollbar(scrollPane.getVerticalScrollBar());
         return scrollPane;
     }
@@ -521,13 +817,6 @@ public class GremlinGEPanel extends PluginPanel {
         return label;
     }
 
-    private void configureOverviewLabel(JLabel label) {
-        label.setAlignmentX(Component.CENTER_ALIGNMENT);
-        label.setHorizontalAlignment(SwingConstants.CENTER);
-        label.setForeground(Color.WHITE);
-        label.setFont(label.getFont().deriveFont(Font.BOLD, 12f));
-    }
-
     private void configureActionButton(JButton button) {
         button.setFocusPainted(false);
         button.setFont(button.getFont().deriveFont(Font.BOLD, 10f));
@@ -547,7 +836,7 @@ public class GremlinGEPanel extends PluginPanel {
         dropdown.setFocusable(false);
     }
 
-    private Color badgeColorForType(String type) { return "BUY".equalsIgnoreCase(type) ? new Color(66, 135, 245) : new Color(196, 96, 76); }
+    private Color badgeColorForType(String type) { return "BUY".equalsIgnoreCase(type) ? ACCENT_COLOR : new Color(196, 96, 76); }
     private Color badgeColorForVolume(String tag) {
         if ("high".equalsIgnoreCase(tag)) return new Color(78, 138, 76);
         if ("med".equalsIgnoreCase(tag)) return new Color(177, 128, 53);

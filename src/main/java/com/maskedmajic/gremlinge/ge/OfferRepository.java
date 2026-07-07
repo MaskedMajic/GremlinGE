@@ -10,7 +10,6 @@ import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,10 +22,6 @@ public class OfferRepository {
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final Path snapshotPath;
     private final Path eventsPath;
-
-    public OfferRepository() {
-        this(Paths.get("data", "ge_snapshot.json"), Paths.get("data", "ge_events.json"));
-    }
 
     public OfferRepository(Path snapshotPath, Path eventsPath) {
         this.snapshotPath = snapshotPath;
