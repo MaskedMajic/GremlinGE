@@ -30,7 +30,6 @@ import java.util.function.Function;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -64,7 +63,7 @@ public class GremlinGEPanel extends PluginPanel {
     private static final int OFFER_ROW_MIN_HEIGHT = 66;
     private static final int FLIP_ROW_MIN_HEIGHT = 82;
     private static final int LIMIT_ROW_MIN_HEIGHT = 42;
-    private static final int ICON_SIZE = 24;
+    private static final int ICON_SIZE = 32;
     private static final int MAX_SUGGESTIONS = 8;
     private static final int SUGGESTION_DEBOUNCE_MILLIS = 120;
     private static final Color CARD_BG = ColorScheme.DARKER_GRAY_COLOR;
@@ -106,6 +105,9 @@ public class GremlinGEPanel extends PluginPanel {
     private final JPanel workspaceActions = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
     private final JButton refreshFlipsButton = new JButton("Refresh Flips");
     private final JButton resetProfitButton = new JButton("Reset Profit");
+    // Kept as a hidden data model only (getSelectedItem/addActionListener API) -- the visible
+    // control is tierSelectorBox below, since JComboBox is unreliable to theme consistently
+    // under macOS Aqua (the popup suggestion approach used for search is proven to work instead).
     private final JComboBox<String> tierDropdown = new JComboBox<>(new String[] {
         "All",
         "0-100k",
@@ -114,6 +116,11 @@ public class GremlinGEPanel extends PluginPanel {
         "10m-50m",
         "50m+"
     });
+    private final JLabel tierDisplayLabel = new JLabel("All");
+    private final JPanel tierSelectorBox = new JPanel(new BorderLayout());
+    private final DefaultListModel<String> tierOptionsModel = new DefaultListModel<>();
+    private final JList<String> tierOptionsList = new JList<>(tierOptionsModel);
+    private final JPopupMenu tierPopup = new JPopupMenu();
 
     private final JTextField searchField = new JTextField();
     private final DefaultListModel<String> suggestionModel = new DefaultListModel<>();
@@ -157,7 +164,7 @@ public class GremlinGEPanel extends PluginPanel {
 
         configureActionButton(refreshFlipsButton);
         configureActionButton(resetProfitButton);
-        configureDropdown(tierDropdown);
+        configureTierSelector();
         workspaceActions.setOpaque(false);
         workspaceActions.setAlignmentX(Component.LEFT_ALIGNMENT);
         workspaceActions.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
@@ -587,7 +594,7 @@ public class GremlinGEPanel extends PluginPanel {
         JPanel card = createCardPanel();
         card.add(createCenteredHeading("Tier Filter"));
         card.add(Box.createVerticalStrut(6));
-        card.add(tierDropdown);
+        card.add(tierSelectorBox);
         card.add(Box.createVerticalStrut(10));
         card.add(buildTabBar());
         card.add(Box.createVerticalStrut(8));
@@ -1067,28 +1074,74 @@ public class GremlinGEPanel extends PluginPanel {
         button.setAlignmentX(Component.CENTER_ALIGNMENT);
     }
 
-    private void configureDropdown(JComboBox<String> dropdown) {
-        dropdown.setUI(new BasicComboBoxUI());
-        dropdown.setOpaque(true);
-        dropdown.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
-        dropdown.setAlignmentX(Component.LEFT_ALIGNMENT);
-        dropdown.setBackground(new Color(46, 46, 46));
-        dropdown.setForeground(Color.WHITE);
-        dropdown.setFont(FontManager.getDefaultFont().deriveFont(12f));
-        dropdown.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
-        dropdown.setFocusable(false);
-        dropdown.setRenderer(new DefaultListCellRenderer() {
+    /**
+     * A themed button+popup stand-in for the tier JComboBox, which macOS Aqua renders as a
+     * half-native/half-themed box no matter how its UI delegate is overridden. tierDropdown
+     * stays around purely as the data model/action-listener source the plugin already wires to.
+     */
+    private void configureTierSelector() {
+        for (int i = 0; i < tierDropdown.getItemCount(); i++) {
+            tierOptionsModel.addElement(tierDropdown.getItemAt(i));
+        }
+
+        tierSelectorBox.setOpaque(true);
+        tierSelectorBox.setBackground(new Color(46, 46, 46));
+        tierSelectorBox.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
+        tierSelectorBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
+        tierSelectorBox.setPreferredSize(new Dimension(10, 26));
+        tierSelectorBox.setAlignmentX(Component.LEFT_ALIGNMENT);
+        tierSelectorBox.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+
+        tierDisplayLabel.setForeground(Color.WHITE);
+        tierDisplayLabel.setFont(FontManager.getDefaultFont().deriveFont(12f));
+        tierDisplayLabel.setBorder(new EmptyBorder(0, 8, 0, 0));
+
+        JLabel arrow = new JLabel("▾");
+        arrow.setForeground(MUTED_TEXT);
+        arrow.setBorder(new EmptyBorder(0, 0, 0, 8));
+
+        tierSelectorBox.add(tierDisplayLabel, BorderLayout.CENTER);
+        tierSelectorBox.add(arrow, BorderLayout.EAST);
+
+        tierOptionsList.setBackground(FIELD_BG);
+        tierOptionsList.setForeground(Color.WHITE);
+        tierOptionsList.setSelectionBackground(ACCENT_COLOR);
+        tierOptionsList.setSelectionForeground(Color.WHITE);
+        tierOptionsList.setFont(FontManager.getDefaultFont().deriveFont(12f));
+        tierOptionsList.setFixedCellHeight(24);
+        tierOptionsList.setBorder(new EmptyBorder(2, 8, 2, 8));
+        tierOptionsList.addMouseListener(new MouseAdapter() {
             @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                label.setOpaque(true);
-                label.setBackground(isSelected ? ACCENT_COLOR : new Color(46, 46, 46));
-                label.setForeground(Color.WHITE);
-                label.setFont(FontManager.getDefaultFont().deriveFont(12f));
-                label.setBorder(new EmptyBorder(5, 8, 5, 8));
-                return label;
+            public void mouseClicked(MouseEvent e) {
+                int index = tierOptionsList.locationToIndex(e.getPoint());
+                if (index >= 0) {
+                    selectTier(tierOptionsModel.get(index));
+                }
             }
         });
+
+        tierPopup.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
+        tierPopup.setBackground(FIELD_BG);
+        tierPopup.add(tierOptionsList);
+        tierPopup.setFocusable(false);
+
+        tierSelectorBox.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (tierPopup.isVisible()) {
+                    tierPopup.setVisible(false);
+                    return;
+                }
+                tierPopup.setPreferredSize(new Dimension(Math.max(160, tierSelectorBox.getWidth()), tierOptionsModel.size() * 24 + 4));
+                tierPopup.show(tierSelectorBox, 0, tierSelectorBox.getHeight());
+            }
+        });
+    }
+
+    private void selectTier(String value) {
+        tierPopup.setVisible(false);
+        tierDisplayLabel.setText(value);
+        tierDropdown.setSelectedItem(value);
     }
 
     private Color badgeColorForType(String type) { return "BUY".equalsIgnoreCase(type) ? BUY_COLOR : SELL_COLOR; }
