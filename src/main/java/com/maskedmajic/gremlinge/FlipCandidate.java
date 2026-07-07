@@ -1,6 +1,7 @@
 package com.maskedmajic.gremlinge;
 
 public class FlipCandidate {
+    public final int itemId;
     public final String name;
     public final int buy;
     public final int sell;
@@ -12,7 +13,8 @@ public class FlipCandidate {
     public final int volume5m;
     public final int score;
 
-    public FlipCandidate(String name, int buy, int sell, int grossMargin, int tax, int netMargin, String volumeTag, int buyLimit, int volume5m) {
+    public FlipCandidate(int itemId, String name, int buy, int sell, int grossMargin, int tax, int netMargin, String volumeTag, int buyLimit, int volume5m) {
+        this.itemId = itemId;
         this.name = name;
         this.buy = buy;
         this.sell = sell;
