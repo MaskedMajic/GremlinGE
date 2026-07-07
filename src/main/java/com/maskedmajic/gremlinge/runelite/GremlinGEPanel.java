@@ -975,10 +975,15 @@ public class GremlinGEPanel extends PluginPanel {
     }
 
     private JScrollPane createScrollPane(JPanel panel) {
+        // PANEL_WIDTH minus the outer panel's own 8px+8px border and this card's 10px+10px
+        // padding. The previous "- 24" guess was 12px too wide, which forced the whole plugin
+        // panel wider than RuneLite's sidebar actually allots it -- everything in this card
+        // (dropdown, tabs, buttons) rendered shifted/clipped as a result.
+        int availableWidth = PluginPanel.PANEL_WIDTH - 16 - (CARD_PADDING * 2);
         JScrollPane scrollPane = new JScrollPane(panel);
         scrollPane.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
-        scrollPane.setPreferredSize(new Dimension(PluginPanel.PANEL_WIDTH - 24, CONTENT_HEIGHT));
-        scrollPane.setMinimumSize(new Dimension(PluginPanel.PANEL_WIDTH - 24, CONTENT_HEIGHT));
+        scrollPane.setPreferredSize(new Dimension(availableWidth, CONTENT_HEIGHT));
+        scrollPane.setMinimumSize(new Dimension(availableWidth, CONTENT_HEIGHT));
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.getViewport().setBackground(LIST_BG);
         styleScrollbar(scrollPane.getVerticalScrollBar());
