@@ -62,9 +62,9 @@ public class GremlinGEPanel extends PluginPanel {
     private static final int CARD_PADDING = 10;
     private static final int CONTENT_HEIGHT = 280;
     private static final int OFFER_ROW_MIN_HEIGHT = 66;
-    private static final int FLIP_ROW_MIN_HEIGHT = 58;
+    private static final int FLIP_ROW_MIN_HEIGHT = 82;
     private static final int LIMIT_ROW_MIN_HEIGHT = 42;
-    private static final int ICON_SIZE = 28;
+    private static final int ICON_SIZE = 24;
     private static final int MAX_SUGGESTIONS = 8;
     private static final int SUGGESTION_DEBOUNCE_MILLIS = 120;
     private static final Color CARD_BG = ColorScheme.DARKER_GRAY_COLOR;
@@ -103,7 +103,7 @@ public class GremlinGEPanel extends PluginPanel {
     private final CardLayout sectionCards = new CardLayout();
     private final JPanel sectionCardPanel = new JPanel(sectionCards);
     private final Map<String, JButton> tabButtons = new LinkedHashMap<String, JButton>();
-    private final JPanel workspaceActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+    private final JPanel workspaceActions = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
     private final JButton refreshFlipsButton = new JButton("Refresh Flips");
     private final JButton resetProfitButton = new JButton("Reset Profit");
     private final JComboBox<String> tierDropdown = new JComboBox<>(new String[] {
@@ -159,6 +159,8 @@ public class GremlinGEPanel extends PluginPanel {
         configureActionButton(resetProfitButton);
         configureDropdown(tierDropdown);
         workspaceActions.setOpaque(false);
+        workspaceActions.setAlignmentX(Component.LEFT_ALIGNMENT);
+        workspaceActions.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
         workspaceActions.add(refreshFlipsButton);
 
         setPlaceholder(offersList, "Waiting for live GE offers...");
@@ -583,7 +585,7 @@ public class GremlinGEPanel extends PluginPanel {
 
     private JPanel buildTabbedSectionCard() {
         JPanel card = createCardPanel();
-        card.add(createCardHeading("Tier Filter"));
+        card.add(createCenteredHeading("Tier Filter"));
         card.add(Box.createVerticalStrut(6));
         card.add(tierDropdown);
         card.add(Box.createVerticalStrut(10));
@@ -734,7 +736,7 @@ public class GremlinGEPanel extends PluginPanel {
         row.add(buildIconLabel(offer.itemId), BorderLayout.WEST);
 
         JPanel content = buildContentBox();
-        content.add(buildTitleLine(trim(offer.itemName, 20), buildBadge(offer.offerType.toString(), typeColor)));
+        content.add(buildTitleLine(displayName(offer.itemName), buildBadge(offer.offerType.toString(), typeColor)));
         content.add(Box.createVerticalStrut(5));
 
         SlimBar bar = new SlimBar(typeColor);
@@ -760,12 +762,15 @@ public class GremlinGEPanel extends PluginPanel {
         row.add(buildIconLabel(recommendation.candidate.itemId), BorderLayout.WEST);
 
         JPanel content = buildContentBox();
-        content.add(buildTitleLine(trim(recommendation.candidate.name, 18), buildBadge(recommendation.candidate.volumeTag.toUpperCase(), badgeColorForVolume(recommendation.candidate.volumeTag))));
+        content.add(buildTitleLine(displayName(recommendation.candidate.name), buildBadge(recommendation.candidate.volumeTag.toUpperCase(), badgeColorForVolume(recommendation.candidate.volumeTag))));
         content.add(Box.createVerticalStrut(3));
 
-        JLabel primary = buildBigNumberLabel(formatQty(recommendation.candidate.margin) + " gp net  •  "
-            + formatQty(recommendation.candidate.buy) + " → " + formatQty(recommendation.candidate.sell));
-        content.add(primary);
+        JLabel net = buildBigNumberLabel(formatQty(recommendation.candidate.margin) + " gp net");
+        content.add(net);
+        content.add(Box.createVerticalStrut(2));
+
+        JLabel prices = buildMainValueLabel("Buy " + formatQty(recommendation.candidate.buy) + "  Sell " + formatQty(recommendation.candidate.sell));
+        content.add(prices);
         content.add(Box.createVerticalStrut(2));
 
         JLabel meta = buildMetaLabel("Gross " + formatQty(recommendation.candidate.grossMargin) + "  Tax " + formatQty(recommendation.candidate.tax) + "  Left " + formatQty(recommendation.remainingLimit));
@@ -780,7 +785,7 @@ public class GremlinGEPanel extends PluginPanel {
         row.add(buildIconLabel(status.itemId), BorderLayout.WEST);
 
         JPanel content = buildContentBox();
-        content.add(buildTitleLine(trim(status.itemName, 20), null));
+        content.add(buildTitleLine(displayName(status.itemName), null));
         content.add(Box.createVerticalStrut(3));
         content.add(buildMainValueLabel(formatQty(status.boughtInWindow) + "/" + formatQty(status.buyLimit) + "  (" + status.resetEta + ")"));
 
@@ -892,8 +897,8 @@ public class GremlinGEPanel extends PluginPanel {
         badge.setOpaque(true);
         badge.setBackground(background);
         badge.setForeground(Color.WHITE);
-        badge.setFont(FontManager.getDefaultBoldFont().deriveFont(10f));
-        badge.setBorder(new EmptyBorder(3, 6, 3, 6));
+        badge.setFont(FontManager.getDefaultBoldFont().deriveFont(9f));
+        badge.setBorder(new EmptyBorder(2, 5, 2, 5));
         return badge;
     }
 
@@ -1039,6 +1044,18 @@ public class GremlinGEPanel extends PluginPanel {
         return label;
     }
 
+    /** Wrapped in BorderLayout.CENTER so it reliably centers within the card's full width. */
+    private JPanel createCenteredHeading(String text) {
+        JLabel label = createCardHeading(text);
+        label.setHorizontalAlignment(SwingConstants.CENTER);
+        JPanel wrap = new JPanel(new BorderLayout());
+        wrap.setOpaque(false);
+        wrap.setAlignmentX(Component.LEFT_ALIGNMENT);
+        wrap.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
+        wrap.add(label, BorderLayout.CENTER);
+        return wrap;
+    }
+
     private void configureActionButton(JButton button) {
         SwingUtil.removeButtonDecorations(button);
         button.setOpaque(true);
@@ -1052,6 +1069,7 @@ public class GremlinGEPanel extends PluginPanel {
 
     private void configureDropdown(JComboBox<String> dropdown) {
         dropdown.setUI(new BasicComboBoxUI());
+        dropdown.setOpaque(true);
         dropdown.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
         dropdown.setAlignmentX(Component.LEFT_ALIGNMENT);
         dropdown.setBackground(new Color(46, 46, 46));
@@ -1084,6 +1102,16 @@ public class GremlinGEPanel extends PluginPanel {
         if (value == null || value.trim().isEmpty()) return "Unknown";
         if (value.length() <= max) return value;
         return value.substring(0, Math.max(0, max - 3)) + "...";
+    }
+
+    /**
+     * Row titles are shown at their full length and left to Swing's own FontMetrics-accurate
+     * ellipsis truncation (guaranteed a real width via BorderLayout.CENTER) rather than a
+     * guessed fixed character count, which was truncating names more aggressively than the
+     * available space actually required.
+     */
+    private String displayName(String value) {
+        return value == null || value.trim().isEmpty() ? "Unknown" : value;
     }
 
     private String formatQty(long value) { return String.format("%,d", value); }
