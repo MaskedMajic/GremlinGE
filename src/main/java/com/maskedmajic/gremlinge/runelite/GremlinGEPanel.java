@@ -780,7 +780,7 @@ public class GremlinGEPanel extends PluginPanel {
         content.add(prices);
         content.add(Box.createVerticalStrut(2));
 
-        JLabel meta = buildMetaLabel("Gross " + formatQty(recommendation.candidate.grossMargin) + "  Tax " + formatQty(recommendation.candidate.tax) + "  Left " + formatQty(recommendation.remainingLimit));
+        JLabel meta = buildMetaLabel("Tax " + formatQty(recommendation.candidate.tax) + "  Left " + formatQty(recommendation.remainingLimit));
         content.add(meta);
 
         row.add(content, BorderLayout.CENTER);
