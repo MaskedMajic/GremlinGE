@@ -11,6 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class MarketDataService {
@@ -25,7 +26,9 @@ public class MarketDataService {
         .build();
     private final Gson gson = new Gson();
 
-    private List<FlipCandidate> cachedCandidates = new ArrayList<FlipCandidate>();
+    // Unfiltered: every tradeable item with a live high/low price, regardless of margin/volume/price thresholds.
+    // fetchCandidates() filters this down per Settings; search/autocomplete reads it directly.
+    private List<FlipCandidate> cachedAllCandidates = new ArrayList<FlipCandidate>();
     private long cacheLoadedAtMillis;
     private long cacheTtlMillis = DEFAULT_CACHE_MILLIS;
 
@@ -33,10 +36,32 @@ public class MarketDataService {
         return fetchCandidates(settings, false);
     }
 
-    public synchronized List<FlipCandidate> fetchCandidates(Settings settings, boolean forceRefresh) throws IOException, InterruptedException {
+    public List<FlipCandidate> fetchCandidates(Settings settings, boolean forceRefresh) throws IOException, InterruptedException {
+        List<FlipCandidate> all = fetchAllCandidates(forceRefresh);
+        List<FlipCandidate> results = new ArrayList<FlipCandidate>();
+        for (FlipCandidate candidate : all) {
+            if (candidate.margin < settings.minMargin) {
+                continue;
+            }
+            if (candidate.buy < settings.minPrice || candidate.buy > settings.maxPrice) {
+                continue;
+            }
+            if (settings.highVolumeOnly && candidate.volume5m < settings.minVolume5m) {
+                continue;
+            }
+            results.add(candidate);
+        }
+        return results;
+    }
+
+    /**
+     * All tradeable items with a live price, unfiltered by margin/volume/price thresholds.
+     * Backs item-name autocomplete and single-item lookups.
+     */
+    public synchronized List<FlipCandidate> fetchAllCandidates(boolean forceRefresh) throws IOException, InterruptedException {
         long now = System.currentTimeMillis();
-        if (!forceRefresh && !cachedCandidates.isEmpty() && now - cacheLoadedAtMillis < cacheTtlMillis) {
-            return new ArrayList<FlipCandidate>(cachedCandidates);
+        if (!forceRefresh && !cachedAllCandidates.isEmpty() && now - cacheLoadedAtMillis < cacheTtlMillis) {
+            return new ArrayList<FlipCandidate>(cachedAllCandidates);
         }
 
         JsonObject latest = fetchJsonObject(LATEST_URL).getAsJsonObject("data");
@@ -63,19 +88,10 @@ public class MarketDataService {
             int grossMargin = high - low;
             int tax = estimateGeTax(high);
             int netMargin = high - tax - low;
-            if (netMargin < settings.minMargin) {
-                continue;
-            }
-            if (low < settings.minPrice || low > settings.maxPrice) {
-                continue;
-            }
 
             int highVol = fiveMinRow.has("highPriceVolume") ? fiveMinRow.get("highPriceVolume").getAsInt() : 0;
             int lowVol = fiveMinRow.has("lowPriceVolume") ? fiveMinRow.get("lowPriceVolume").getAsInt() : 0;
             int totalVol = highVol + lowVol;
-            if (settings.highVolumeOnly && totalVol < settings.minVolume5m) {
-                continue;
-            }
 
             int limit = item.has("limit") && !item.get("limit").isJsonNull() ? item.get("limit").getAsInt() : 0;
             String name = item.get("name").getAsString();
@@ -83,9 +99,33 @@ public class MarketDataService {
             results.add(new FlipCandidate(name, low, high, grossMargin, tax, netMargin, volumeTag, limit, totalVol));
         }
 
-        cachedCandidates = new ArrayList<FlipCandidate>(results);
+        cachedAllCandidates = new ArrayList<FlipCandidate>(results);
         cacheLoadedAtMillis = now;
-        return new ArrayList<FlipCandidate>(cachedCandidates);
+        return new ArrayList<FlipCandidate>(cachedAllCandidates);
+    }
+
+    /** Sorted, de-duplicated item names for search/autocomplete. Triggers a fetch if the cache is stale. */
+    public List<String> fetchItemNames() throws IOException, InterruptedException {
+        List<FlipCandidate> all = fetchAllCandidates(false);
+        List<String> names = new ArrayList<String>(all.size());
+        for (FlipCandidate candidate : all) {
+            names.add(candidate.name);
+        }
+        Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
+        return names;
+    }
+
+    /** Exact (case-insensitive) name lookup, bypassing all Settings thresholds. Null if not found. */
+    public FlipCandidate findByName(String itemName) throws IOException, InterruptedException {
+        if (itemName == null || itemName.trim().isEmpty()) {
+            return null;
+        }
+        for (FlipCandidate candidate : fetchAllCandidates(false)) {
+            if (candidate.name.equalsIgnoreCase(itemName.trim())) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     public synchronized void setCacheTtlMillis(long cacheTtlMillis) {
@@ -100,7 +140,7 @@ public class MarketDataService {
     }
 
     public synchronized void clearCache() {
-        cachedCandidates = new ArrayList<FlipCandidate>();
+        cachedAllCandidates = new ArrayList<FlipCandidate>();
         cacheLoadedAtMillis = 0L;
     }
 

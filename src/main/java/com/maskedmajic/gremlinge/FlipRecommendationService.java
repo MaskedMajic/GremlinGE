@@ -2,6 +2,7 @@ package com.maskedmajic.gremlinge;
 
 import com.maskedmajic.gremlinge.ge.GeOfferState;
 import com.maskedmajic.gremlinge.ge.LimitStatus;
+import com.maskedmajic.gremlinge.ge.LimitUsageService;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -14,13 +15,23 @@ import java.util.Set;
 
 public class FlipRecommendationService {
     private final MarketDataService marketDataService;
+    private final LimitUsageService limitUsageService;
 
     public FlipRecommendationService() {
-        this(new MarketDataService());
+        this(new MarketDataService(), null);
+    }
+
+    public FlipRecommendationService(LimitUsageService limitUsageService) {
+        this(new MarketDataService(), limitUsageService);
     }
 
     public FlipRecommendationService(MarketDataService marketDataService) {
+        this(marketDataService, null);
+    }
+
+    public FlipRecommendationService(MarketDataService marketDataService, LimitUsageService limitUsageService) {
         this.marketDataService = marketDataService;
+        this.limitUsageService = limitUsageService;
     }
 
     public void setCacheTtlMillis(long cacheTtlMillis) {
@@ -55,7 +66,7 @@ public class FlipRecommendationService {
         for (FlipCandidate candidate : candidates) {
             boolean alreadyActive = activeNames.contains(normalize(candidate.name));
             LimitStatus status = limitsByName.get(normalize(candidate.name));
-            int remainingLimit = status != null ? status.remaining : candidate.buyLimit;
+            int remainingLimit = resolveRemainingLimit(candidate, status);
             String priceBand = classifyPriceBand(candidate.buy);
 
             if (!matchesBand(priceBand, selectedBand)) {
@@ -85,6 +96,56 @@ public class FlipRecommendationService {
         });
 
         return diversify(recommendations, maxResults, selectedBand);
+    }
+
+    /**
+     * Looks up a single item by exact (case-insensitive) name, bypassing the normal
+     * margin/volume/price-band filters. Used for on-demand search results.
+     */
+    public FlipRecommendation search(
+        String itemName,
+        List<GeOfferState> activeOffers,
+        List<LimitStatus> limitStatuses
+    ) throws IOException, InterruptedException {
+        FlipCandidate candidate = marketDataService.findByName(itemName);
+        if (candidate == null) {
+            return null;
+        }
+
+        Set<String> activeNames = buildActiveNameSet(activeOffers);
+        Map<String, LimitStatus> limitsByName = buildLimitMap(limitStatuses);
+
+        boolean alreadyActive = activeNames.contains(normalize(candidate.name));
+        LimitStatus status = limitsByName.get(normalize(candidate.name));
+        int remainingLimit = resolveRemainingLimit(candidate, status);
+        String priceBand = classifyPriceBand(candidate.buy);
+        int recommendationScore = candidate.score
+            + Math.min(remainingLimit / 100, 100)
+            + volumeTagBonus(candidate.volumeTag)
+            + priceBandBonus(priceBand)
+            + recentActivityBonus(candidate.volume5m);
+
+        return new FlipRecommendation(candidate, remainingLimit, alreadyActive, recommendationScore, priceBand);
+    }
+
+    /**
+     * Remaining buy limit for a candidate that isn't sitting in an active GE slot right now.
+     * Falls back to raw purchase history so items don't appear to have a full limit again
+     * just because their offer was collected/cleared.
+     */
+    private int resolveRemainingLimit(FlipCandidate candidate, LimitStatus status) {
+        if (status != null) {
+            return status.remaining;
+        }
+        if (limitUsageService == null || candidate.buyLimit <= 0) {
+            return candidate.buyLimit;
+        }
+        try {
+            int bought = limitUsageService.getBoughtInWindow(candidate.name);
+            return Math.max(0, candidate.buyLimit - bought);
+        } catch (IOException e) {
+            return candidate.buyLimit;
+        }
     }
 
     private List<FlipRecommendation> diversify(List<FlipRecommendation> recommendations, int maxResults, String selectedBand) {

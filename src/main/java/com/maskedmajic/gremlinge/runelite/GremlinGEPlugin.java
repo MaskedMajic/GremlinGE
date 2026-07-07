@@ -3,6 +3,7 @@ package com.maskedmajic.gremlinge.runelite;
 import com.google.inject.Provides;
 import com.maskedmajic.gremlinge.FlipRecommendation;
 import com.maskedmajic.gremlinge.FlipRecommendationService;
+import com.maskedmajic.gremlinge.MarketDataService;
 import com.maskedmajic.gremlinge.ScannerSettingsLoader;
 import com.maskedmajic.gremlinge.Settings;
 import com.maskedmajic.gremlinge.ge.GeOfferEvent;
@@ -16,14 +17,19 @@ import com.maskedmajic.gremlinge.ge.OfferRepository;
 import com.maskedmajic.gremlinge.profit.ProfitSummary;
 import com.maskedmajic.gremlinge.profit.ProfitTrackerService;
 import java.awt.image.BufferedImage;
-import java.nio.file.Paths;
+import java.io.File;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javax.swing.JComboBox;
+import javax.swing.SwingUtilities;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.events.GrandExchangeOfferChanged;
+import net.runelite.client.RuneLite;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ClientShutdown;
@@ -51,14 +57,26 @@ public class GremlinGEPlugin extends Plugin {
     @Inject
     private GremlinGEConfig config;
 
+    private static final Path DATA_DIR = new File(RuneLite.RUNELITE_DIR, "gremlinge").toPath();
+
     private final GeStateReader stateReader = new GeStateReader();
     private final GeStateTracker stateTracker = new GeStateTracker();
-    private final OfferRepository offerRepository = new OfferRepository();
-    private final LimitUsageService limitUsageService = new LimitUsageService(Paths.get("data", "purchases.json"));
-    private final ProfitTrackerService profitTrackerService = new ProfitTrackerService(Paths.get("data", "fills.json"));
-    private final FlipRecommendationService flipRecommendationService = new FlipRecommendationService();
+    private final OfferRepository offerRepository = new OfferRepository(
+        DATA_DIR.resolve("ge_snapshot.json"), DATA_DIR.resolve("ge_events.json"));
+    private final LimitUsageService limitUsageService = new LimitUsageService(DATA_DIR.resolve("purchases.json"));
+    private final ProfitTrackerService profitTrackerService = new ProfitTrackerService(DATA_DIR.resolve("fills.json"));
+    private final MarketDataService marketDataService = new MarketDataService();
+    private final FlipRecommendationService flipRecommendationService = new FlipRecommendationService(marketDataService, limitUsageService);
     private final GremlinGEPanel panel = new GremlinGEPanel();
     private final List<GeOfferEvent> recentEvents = new ArrayList<GeOfferEvent>();
+    private final ExecutorService searchExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "gremlinge-search");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    private static final int MAX_SUGGESTIONS = 8;
+    private volatile List<String> itemNameIndex = Collections.emptyList();
 
     private NavigationButton navigationButton;
     private boolean forceFlipRefresh;
@@ -77,6 +95,7 @@ public class GremlinGEPlugin extends Plugin {
         wirePanelActions();
         loadRecentEvents();
         loadPreviousSnapshot();
+        loadItemNameIndex();
 
         GeOfferSnapshot snapshot = stateReader.readCurrentSnapshot(client, itemManager);
         stateTracker.update(snapshot);
@@ -87,6 +106,7 @@ public class GremlinGEPlugin extends Plugin {
     @Override
     protected void shutDown() {
         persistSnapshot(stateReader.readCurrentSnapshot(client, itemManager));
+        searchExecutor.shutdownNow();
 
         if (navigationButton != null) {
             clientToolbar.removeNavigation(navigationButton);
@@ -155,6 +175,74 @@ public class GremlinGEPlugin extends Plugin {
             flipRecommendationService.clearCache();
             forceFlipRefresh = true;
             refreshPanel(stateReader.readCurrentSnapshot(client, itemManager));
+        });
+
+        panel.setSuggestionProvider(this::matchItemNames);
+        panel.setSearchSelectionHandler(this::performSearch);
+    }
+
+    private List<String> matchItemNames(String query) {
+        String needle = query.toLowerCase();
+        List<String> startsWith = new ArrayList<String>();
+        List<String> contains = new ArrayList<String>();
+
+        for (String name : itemNameIndex) {
+            String lower = name.toLowerCase();
+            if (lower.startsWith(needle)) {
+                if (startsWith.size() < MAX_SUGGESTIONS) {
+                    startsWith.add(name);
+                }
+            } else if (lower.contains(needle)) {
+                if (contains.size() < MAX_SUGGESTIONS) {
+                    contains.add(name);
+                }
+            }
+        }
+
+        List<String> combined = new ArrayList<String>(startsWith);
+        for (String name : contains) {
+            if (combined.size() >= MAX_SUGGESTIONS) {
+                break;
+            }
+            combined.add(name);
+        }
+        return combined;
+    }
+
+    private void loadItemNameIndex() {
+        searchExecutor.submit(() -> {
+            try {
+                itemNameIndex = marketDataService.fetchItemNames();
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    private void performSearch(String itemName) {
+        GeOfferSnapshot snapshot = stateReader.readCurrentSnapshot(client, itemManager);
+        List<GeOfferState> offers = snapshot.slots;
+        List<LimitStatus> statuses;
+        try {
+            statuses = limitUsageService.buildLimitStatuses(offers);
+        } catch (Exception e) {
+            statuses = Collections.emptyList();
+        }
+        final List<LimitStatus> capturedStatuses = statuses;
+
+        searchExecutor.submit(() -> {
+            FlipRecommendation result = null;
+            try {
+                result = flipRecommendationService.search(itemName, offers, capturedStatuses);
+            } catch (Exception ignored) {
+            }
+            final FlipRecommendation finalResult = result;
+            SwingUtilities.invokeLater(() -> {
+                if (finalResult != null) {
+                    panel.showSearchResult(itemName, finalResult);
+                } else {
+                    panel.showSearchError(itemName);
+                }
+            });
         });
     }
 
