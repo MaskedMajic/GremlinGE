@@ -114,12 +114,14 @@ public class LimitUsageService {
 
     public List<LimitStatus> buildLimitStatuses(List<GeOfferState> offers) throws IOException {
         Map<String, Integer> itemLimits = new LinkedHashMap<String, Integer>();
+        Map<String, Integer> itemIds = new LinkedHashMap<String, Integer>();
         for (GeOfferState offer : offers) {
             if (offer == null || offer.itemName == null || offer.itemName.trim().isEmpty()) {
                 continue;
             }
             if (offer.buyLimit > 0) {
                 itemLimits.put(offer.itemName, offer.buyLimit);
+                itemIds.put(offer.itemName, offer.itemId);
             }
         }
 
@@ -130,7 +132,8 @@ public class LimitUsageService {
             int bought = getBoughtInWindow(itemName);
             int remaining = Math.max(0, buyLimit - bought);
             String eta = getNextResetEta(itemName);
-            result.add(new LimitStatus(itemName, buyLimit, bought, remaining, eta));
+            int itemId = itemIds.containsKey(itemName) ? itemIds.get(itemName) : 0;
+            result.add(new LimitStatus(itemId, itemName, buyLimit, bought, remaining, eta));
         }
 
         result.sort(new Comparator<LimitStatus>() {

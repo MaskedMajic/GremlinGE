@@ -96,7 +96,7 @@ public class MarketDataService {
             int limit = item.has("limit") && !item.get("limit").isJsonNull() ? item.get("limit").getAsInt() : 0;
             String name = item.get("name").getAsString();
             String volumeTag = classifyVolume(totalVol);
-            results.add(new FlipCandidate(name, low, high, grossMargin, tax, netMargin, volumeTag, limit, totalVol));
+            results.add(new FlipCandidate(id, name, low, high, grossMargin, tax, netMargin, volumeTag, limit, totalVol));
         }
 
         cachedAllCandidates = new ArrayList<FlipCandidate>(results);

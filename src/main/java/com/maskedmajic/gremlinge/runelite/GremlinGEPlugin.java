@@ -179,6 +179,7 @@ public class GremlinGEPlugin extends Plugin {
 
         panel.setSuggestionProvider(this::matchItemNames);
         panel.setSearchSelectionHandler(this::performSearch);
+        panel.setIconLoader(itemManager::getImage);
     }
 
     private List<String> matchItemNames(String query) {
