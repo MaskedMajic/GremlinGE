@@ -327,6 +327,7 @@ public class GremlinGEPanel extends PluginPanel {
         JPanel row = new JPanel(new BorderLayout(10, 0));
         row.setOpaque(false);
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
 
         JLabel avatar = new JLabel("G");
         avatar.setPreferredSize(new Dimension(32, 32));
@@ -602,6 +603,8 @@ public class GremlinGEPanel extends PluginPanel {
         card.add(Box.createVerticalStrut(8));
 
         sectionCardPanel.setOpaque(false);
+        sectionCardPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        sectionCardPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, CONTENT_HEIGHT));
         sectionCardPanel.add(createScrollPane(offersList), TAB_OFFERS);
         sectionCardPanel.add(createScrollPane(flipsList), TAB_FLIPS);
         sectionCardPanel.add(createScrollPane(limitsList), TAB_LIMITS);
@@ -975,15 +978,18 @@ public class GremlinGEPanel extends PluginPanel {
     }
 
     private JScrollPane createScrollPane(JPanel panel) {
-        // PANEL_WIDTH minus the outer panel's own 8px+8px border and this card's 10px+10px
-        // padding. The previous "- 24" guess was 12px too wide, which forced the whole plugin
-        // panel wider than RuneLite's sidebar actually allots it -- everything in this card
-        // (dropdown, tabs, buttons) rendered shifted/clipped as a result.
-        int availableWidth = PluginPanel.PANEL_WIDTH - 16 - (CARD_PADDING * 2);
+        // Width is intentionally NOT hardcoded from PluginPanel.PANEL_WIDTH -- that constant is
+        // only a default; RuneLite's sidebar is user-resizable, so any fixed-pixel-width guess
+        // here would be wrong whenever the sidebar isn't exactly that width, and every card
+        // above this one (header/overview/search) already relies on dynamic stretch instead of
+        // a hardcoded number. Matching that: small preferred-width hint + unlimited maximum
+        // width lets BoxLayout stretch this to whatever the card's real width is at runtime.
         JScrollPane scrollPane = new JScrollPane(panel);
         scrollPane.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
-        scrollPane.setPreferredSize(new Dimension(availableWidth, CONTENT_HEIGHT));
-        scrollPane.setMinimumSize(new Dimension(availableWidth, CONTENT_HEIGHT));
+        scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
+        scrollPane.setPreferredSize(new Dimension(10, CONTENT_HEIGHT));
+        scrollPane.setMinimumSize(new Dimension(10, CONTENT_HEIGHT));
+        scrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, CONTENT_HEIGHT));
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.getViewport().setBackground(LIST_BG);
         styleScrollbar(scrollPane.getVerticalScrollBar());
